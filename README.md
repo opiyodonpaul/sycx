@@ -31,25 +31,20 @@ SycX/
 ├── sycx_flutter_app/         # Folder for the Flutter mobile application
 │   ├── lib/                  # Contains the main Flutter code
 │   ├── assets/               # Images, fonts, etc.
-│   ├── test/                 # Unit and widget tests
 │   ├── android/              # Android specific files
 │   ├── ios/                  # iOS specific files
 │   └── pubspec.yaml          # Flutter dependencies and metadata
-│
-├── sycx_flask_api/           # Folder for the Flask API backend
-│   ├── app/                  # Contains the main Flask application logic
-│   │   ├── __init__.py       # Initializes the Flask app
-│   │   ├── routes.py         # Defines the API endpoints
-│   │   ├── models.py         # Database models (if using SQLAlchemy)
-│   │   └── utils.py          # Utility functions and classes
-│   ├── tests/                # Contains tests for the API
-│   ├── venv/                 # Virtual environment for Python dependencies
-│   ├── config.py             # Configuration settings for the Flask app
-│   ├── requirements.txt      # Python dependencies
-│   ├── run.py                # Entry point to start the Flask server
-│   └── README.md             # Instructions specific to the Flask API
-│
-└── README.md                 # Main project documentation
+
+├── venv/
+├── .env
+├── .gitignore
+├── API-DOCUMENTATION.md
+├── app.py
+├── CONTRIBUTING
+├── LICENSE
+├── Procfile
+├── README.md
+└── requirements.txt
 ```
 
 ## Features
@@ -60,15 +55,15 @@ SycX/
 - Cross-Platform Availability: Available on both Android and iOS platforms.
 - Secure Data Handling: Ensures user data privacy and security with robust encryption and compliance with regulations.
 
-# Getting Started
+## Getting Started
 
-## Prerequisites
+### Prerequisites
 
 - Flutter SDK: Install Flutter
 - Python 3.x: Install Python
 - Virtual Environment: (Recommended) Create a virtual environment
 
-## Setting Up the Flutter App
+### Setting Up the Flutter App
 Clone the repository:
 
 ```bash
@@ -88,18 +83,26 @@ Run the app on your device:
 flutter run
 ```
 
-## Setting Up the Flask API
+Detailed SycX Flutter App documentation can be found in the [SycX DOCUMENTATION](sycx_flutter_app/README.md).
+
+### Setting Up the Flask API
 Navigate to the Flask API directory:
 
 ```bash
-cd sycx/sycx_flask_api
+cd sycx
 ```
 
 Create and activate a virtual environment:
 
 ```bash
-python3 -m venv venv
-venv\Scripts\activate
+python -m venv venv
+.\venv\Scripts\Activate
+```
+
+Update pip:
+
+```bash
+python.exe -m pip install --upgrade pip
 ```
 
 Install the required Python packages:
@@ -111,7 +114,8 @@ pip install -r requirements.txt
 Run the Flask server:
 
 ```bash
-python run.py
+python app.py
+
 ## The API will be available at http://localhost:5000.
 ```
 
@@ -130,7 +134,7 @@ The Flask API includes the following endpoints:
 - GET /summary: Retrieve the summary of an uploaded document.
 - POST /feedback: Submit feedback on the generated summaries.
 
-Detailed API documentation can be found in the sycx_flask_api/README.md.
+Detailed API documentation can be found in the [API DOCUMENTATION](API-DOCUMENTATION.md).
 
 ## Contributing
 We welcome contributions from the community! Please follow the steps below to contribute:
@@ -139,7 +143,7 @@ We welcome contributions from the community! Please follow the steps below to co
 - Create a new branch with a descriptive name for your feature or bugfix.
 - Commit your changes and push them to your fork.
 - Submit a pull request to the main repository.
-- Before submitting, make sure to check out our CONTRIBUTING.md file for more details.
+- Before submitting, make sure to check out our [CONTRIBUTING](CONTRIBUTING.md) file for more details.
 
 ## License
 This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for more information.
@@ -150,3 +154,5 @@ For any questions or issues, please contact:
 - Project Lead: Don Artkins
 - Email: opiyodon9@gmail.com
 - GitHub: https://github.com/opiyodon
+- Whatsapp: https://wa.me/254714230692
+- Support Team: info.sycx.ke@gmail.com

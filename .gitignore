@@ -44,3 +44,6 @@ coverage.xml
 .env
 .env.*
 .venv
+
+# API logs
+api.log

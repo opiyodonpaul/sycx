@@ -1,26 +1,32 @@
+# LICENSE
 
-### LICENSE
+## MIT License for SycX Project
+Version 1.0, September 2024  
+http://opensource.org/licenses/MIT
 
-#### MIT License for SycX Project
+### TERMS AND CONDITIONS FOR USE, REPRODUCTION, AND DISTRIBUTION
 
-MIT License
+1. **Definitions.**
 
-Copyright (c) 2024 Opiyo Don Paul (Don Artkins)
+   - "License" shall mean the terms and conditions for use, reproduction, and distribution as defined by Sections 1 through 5 of this document.
+   - "Licensor" shall mean the copyright owner or entity authorized by the copyright owner that is granting the License.
+   - "You" (or "Your") shall mean an individual or Legal Entity exercising permissions granted by this License.
+   - "Software" shall mean the software and associated documentation files made available under this License, as indicated by a copyright notice included in or attached to the work.
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+2. **Grant of License.**  
+   Subject to the terms and conditions of this License, the Licensor hereby grants to You a perpetual, worldwide, non-exclusive, no-charge, royalty-free, irrevocable copyright license to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+   - The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+3. **Redistribution.**  
+   You may reproduce and distribute copies of the Software or Derivative Works thereof in any medium, with or without modifications, provided that You meet the following conditions:
+
+   - (a) You must give any other recipients of the Software or Derivative Works a copy of this License; and
+   - (b) You must cause any modified files to carry prominent notices stating that You changed the files; and
+   - (c) You must retain, in the Source form of any Derivative Works that You distribute, all copyright, patent, trademark, and attribution notices from the Source form of the Software, excluding those notices that do not pertain to any part of the Derivative Works.
+
+4. **Disclaimer of Warranty.**  
+   The Software is provided "AS IS", WITHOUT WARRANTY OF ANY KIND, express or implied, including but not limited to the warranties of MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, and NONINFRINGEMENT. In no event shall the Licensor be liable for any claim, damages, or other liability, whether in an action of contract, tort, or otherwise, arising from, out of, or in connection with the Software or the use or other dealings in the Software.
+
+5. **Limitation of Liability.**  
+   In no event and under no legal theory, whether in tort (including negligence), contract, or otherwise, unless required by applicable law (such as deliberate and grossly negligent acts) or agreed to in writing, shall the Licensor be liable to You for damages, including any direct, indirect, special, incidental, or consequential damages of any character arising as a result of this License or out of the use or inability to use the Software (including but not limited to damages for loss of goodwill, work stoppage, computer failure or malfunction, or any and all other commercial damages or losses), even if such Licensor has been advised of the possibility of such damages.
