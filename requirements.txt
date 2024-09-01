@@ -1,1 +1,8 @@
 Flask
+pymongo
+python-dotenv
+openai
+requests
+Pillow
+tensorflow
+nltk

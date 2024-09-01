@@ -1,0 +1,48 @@
+{
+    "intents": [
+        {
+            "tag": "summarize",
+            "patterns": [
+                "Summarize this document.",
+                "I need a summary.",
+                "Create a summary for me.",
+                "Can you summarize this?",
+                "Summarize this file."
+            ],
+            "responses": [
+                "Generating a summary...",
+                "Sure, summarizing the document...",
+                "I'll create a summary for you.",
+                "Here's your summary."
+            ]
+        },
+        {
+            "tag": "feedback_positive",
+            "patterns": [
+                "This summary is great!",
+                "I like this summary.",
+                "Well summarized.",
+                "This is exactly what I needed."
+            ],
+            "responses": [
+                "Thank you for your feedback!",
+                "Glad you liked the summary.",
+                "Thank you, I'm learning to improve further."
+            ]
+        },
+        {
+            "tag": "feedback_negative",
+            "patterns": [
+                "This summary needs improvement.",
+                "I don't like this summary.",
+                "This summary is not accurate.",
+                "This could be better."
+            ],
+            "responses": [
+                "Sorry about that, I'll improve based on your feedback.",
+                "Thank you for the feedback, I'll do better.",
+                "I appreciate your feedback and will adjust accordingly."
+            ]
+        }
+    ]
+}
