@@ -1,5 +1,8 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:sycx_flutter_app/services/auth.dart';
+import 'package:sycx_flutter_app/utils/convert_to_base64.dart';
+import 'package:sycx_flutter_app/utils/pick_image.dart';
 import 'package:sycx_flutter_app/widgets/animated_button.dart';
 import 'package:sycx_flutter_app/widgets/custom_textfield.dart';
 import 'package:sycx_flutter_app/widgets/loading_widget.dart';
@@ -42,6 +45,46 @@ class RegisterState extends State<Register> {
     }
   }
 
+  void _googleSignIn() async {
+    setState(() {
+      _loading = true;
+    });
+
+    bool success = await Auth.googleSignIn();
+
+    setState(() {
+      _loading = false;
+    });
+
+    if (success) {
+      Navigator.pushReplacementNamed(context, '/home');
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Google sign-in failed'),
+      ));
+    }
+  }
+
+  void _appleSignIn() async {
+    setState(() {
+      _loading = true;
+    });
+
+    bool success = await Auth.appleSignIn();
+
+    setState(() {
+      _loading = false;
+    });
+
+    if (success) {
+      Navigator.pushReplacementNamed(context, '/home');
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Apple sign-in failed'),
+      ));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -76,8 +119,8 @@ class RegisterState extends State<Register> {
                     TextButton(
                       onPressed: () async {
                         final file =
-                            await pickImage(); // Implement image picker
-                        _profilePic = await convertToBase64(file);
+                            PickImage(); // Implement image picker
+                        _profilePic = await convertFileToBase64(file as File);
                       },
                       child: const Text('Upload Profile Picture'),
                     ),
@@ -85,6 +128,16 @@ class RegisterState extends State<Register> {
                     AnimatedButton(
                       text: 'Register',
                       onPressed: _register,
+                    ),
+                    const SizedBox(height: 20),
+                    AnimatedButton(
+                      text: 'Sign in with Google',
+                      onPressed: _googleSignIn,
+                    ),
+                    const SizedBox(height: 10),
+                    AnimatedButton(
+                      text: 'Sign in with Apple',
+                      onPressed: _appleSignIn,
                     ),
                   ],
                 ),

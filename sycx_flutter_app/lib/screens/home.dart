@@ -38,8 +38,10 @@ class Home extends StatelessWidget {
                   title: 'Upload Document',
                   icon: Icons.upload_file,
                   onTap: () {
-                    Navigator.push(context,
-                        MaterialPageRoute(builder: (_) => const Summary()));
+                    Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (_) => const SummaryScreen()));
                   },
                   summary: null,
                   onView: () {},

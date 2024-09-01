@@ -39,6 +39,46 @@ class LoginState extends State<Login> {
     }
   }
 
+  void _googleSignIn() async {
+    setState(() {
+      _loading = true;
+    });
+
+    bool success = await Auth.googleSignIn();
+
+    setState(() {
+      _loading = false;
+    });
+
+    if (success) {
+      Navigator.pushReplacementNamed(context, '/home');
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Google sign-in failed'),
+      ));
+    }
+  }
+
+  void _appleSignIn() async {
+    setState(() {
+      _loading = true;
+    });
+
+    bool success = await Auth.appleSignIn();
+
+    setState(() {
+      _loading = false;
+    });
+
+    if (success) {
+      Navigator.pushReplacementNamed(context, '/home');
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Apple sign-in failed'),
+      ));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -71,9 +111,19 @@ class LoginState extends State<Login> {
                     ),
                     TextButton(
                       onPressed: () {
-                        Navigator.pushNamed(context, '/reset_password');
+                        Navigator.pushNamed(context, '/forgot_password');
                       },
                       child: const Text('Forgot Password?'),
+                    ),
+                    const SizedBox(height: 20),
+                    AnimatedButton(
+                      text: 'Sign in with Google',
+                      onPressed: _googleSignIn,
+                    ),
+                    const SizedBox(height: 10),
+                    AnimatedButton(
+                      text: 'Sign in with Apple',
+                      onPressed: _appleSignIn,
                     ),
                   ],
                 ),

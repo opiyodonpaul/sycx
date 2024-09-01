@@ -4,36 +4,26 @@ import 'package:sycx_flutter_app/widgets/animated_button.dart';
 import 'package:sycx_flutter_app/widgets/custom_textfield.dart';
 import 'package:sycx_flutter_app/widgets/loading_widget.dart';
 
-class ResetPassword extends StatefulWidget {
-  final String token;
-
-  const ResetPassword({super.key, required this.token});
+class ForgotPassword extends StatefulWidget {
+  const ForgotPassword({super.key});
 
   @override
-  ResetPasswordState createState() => ResetPasswordState();
+  ForgotPasswordState createState() => ForgotPasswordState();
 }
 
-class ResetPasswordState extends State<ResetPassword> {
+class ForgotPasswordState extends State<ForgotPassword> {
   final _formKey = GlobalKey<FormState>();
-  String _newPassword = '';
-  String _confirmPassword = '';
+  String _email = '';
   bool _loading = false;
 
   void _resetPassword() async {
     if (!_formKey.currentState!.validate()) return;
 
-    if (_newPassword != _confirmPassword) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('Passwords do not match'),
-      ));
-      return;
-    }
-
     setState(() {
       _loading = true;
     });
 
-    bool success = await Auth.confirmResetPassword(widget.token, _newPassword);
+    bool success = await Auth.resetPassword(_email);
 
     setState(() {
       _loading = false;
@@ -41,12 +31,12 @@ class ResetPasswordState extends State<ResetPassword> {
 
     if (success) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('Password reset successfully'),
+        content: Text('Password reset link sent to your email'),
       ));
-      Navigator.pushReplacementNamed(context, '/login');
+      Navigator.pop(context);
     } else {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('Failed to reset password'),
+        content: Text('Failed to send password reset link'),
       ));
     }
   }
@@ -54,7 +44,7 @@ class ResetPasswordState extends State<ResetPassword> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Reset Password')),
+      appBar: AppBar(title: const Text('Forgot Password')),
       body: _loading
           ? const Loading()
           : Padding(
@@ -65,22 +55,14 @@ class ResetPasswordState extends State<ResetPassword> {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     CustomTextField(
-                      hintText: 'New Password',
-                      obscureText: true,
-                      onChanged: (value) => _newPassword = value,
+                      hintText: 'Email',
+                      onChanged: (value) => _email = value,
                       validator: (value) =>
-                          value!.isEmpty ? 'Enter a new password' : null,
-                    ),
-                    CustomTextField(
-                      hintText: 'Confirm Password',
-                      obscureText: true,
-                      onChanged: (value) => _confirmPassword = value,
-                      validator: (value) =>
-                          value!.isEmpty ? 'Confirm your password' : null,
+                          value!.isEmpty ? 'Enter an email' : null,
                     ),
                     const SizedBox(height: 20),
                     AnimatedButton(
-                      text: 'Reset Password',
+                      text: 'Send Reset Link',
                       onPressed: _resetPassword,
                     ),
                   ],

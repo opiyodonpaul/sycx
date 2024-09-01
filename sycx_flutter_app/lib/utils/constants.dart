@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-const String baseUrl = 'https://your-api-url.com/api';
+const String baseUrl = 'https://sycx-production.up.railway.app/api';
 
 // Colors
 const Color primaryColor = Color(0xFF0A0E21);

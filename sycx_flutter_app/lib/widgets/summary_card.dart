@@ -2,20 +2,23 @@ import 'package:flutter/material.dart';
 import 'package:sycx_flutter_app/models/summary.dart';
 
 class SummaryCard extends StatelessWidget {
-  final Summary summary;
-  final VoidCallback onView;
-  final VoidCallback onDelete;
-  final VoidCallback onDownload;
+  final String title;
+  final IconData icon;
+  final VoidCallback onTap;
+  final Summary? summary;
+  final VoidCallback? onView;
+  final VoidCallback? onDelete;
+  final VoidCallback? onDownload;
 
   const SummaryCard({
     super.key,
-    required this.summary,
-    required this.onView,
-    required this.onDelete,
-    required this.onDownload,
-    required String title,
-    required IconData icon,
-    required Null Function() onTap,
+    required this.title,
+    required this.icon,
+    required this.onTap,
+    this.summary,
+    this.onView,
+    this.onDelete,
+    this.onDownload,
   });
 
   @override
@@ -41,41 +44,45 @@ class SummaryCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            summary.title,
+            title,
             style: const TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.bold,
             ),
           ),
           const SizedBox(height: 10),
-          Text(
-            summary.summaryText.length > 100
-                ? '${summary.summaryText.substring(0, 100)}...'
-                : summary.summaryText,
-            style: TextStyle(
-              fontSize: 14,
-              color: Colors.grey[700],
+          if (summary != null)
+            Text(
+              summary!.summaryText.length > 100
+                  ? '${summary!.summaryText.substring(0, 100)}...'
+                  : summary!.summaryText,
+              style: TextStyle(
+                fontSize: 14,
+                color: Colors.grey[700],
+              ),
             ),
-          ),
           const Spacer(),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              IconButton(
-                icon: const Icon(Icons.visibility),
-                color: Colors.blueAccent,
-                onPressed: onView,
-              ),
-              IconButton(
-                icon: const Icon(Icons.download),
-                color: Colors.green,
-                onPressed: onDownload,
-              ),
-              IconButton(
-                icon: const Icon(Icons.delete),
-                color: Colors.redAccent,
-                onPressed: onDelete,
-              ),
+              if (onView != null)
+                IconButton(
+                  icon: const Icon(Icons.visibility),
+                  color: Colors.blueAccent,
+                  onPressed: onView,
+                ),
+              if (onDownload != null)
+                IconButton(
+                  icon: const Icon(Icons.download),
+                  color: Colors.green,
+                  onPressed: onDownload,
+                ),
+              if (onDelete != null)
+                IconButton(
+                  icon: const Icon(Icons.delete),
+                  color: Colors.redAccent,
+                  onPressed: onDelete,
+                ),
             ],
           ),
         ],

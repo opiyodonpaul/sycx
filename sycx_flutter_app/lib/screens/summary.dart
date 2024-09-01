@@ -1,17 +1,18 @@
 import 'package:flutter/material.dart';
+import 'package:sycx_flutter_app/models/summary.dart';
 import 'package:sycx_flutter_app/services/summary.dart';
 import 'package:sycx_flutter_app/widgets/loading_widget.dart';
 
-class Summary extends StatefulWidget {
-  const Summary({super.key});
+class SummaryScreen extends StatefulWidget {
+  const SummaryScreen({super.key});
 
   @override
-  SummaryState createState() => SummaryState();
+  SummaryScreenState createState() => SummaryScreenState();
 }
 
-class SummaryState extends State<Summary> {
+class SummaryScreenState extends State<SummaryScreen> {
   bool _loading = false;
-  String? _summary;
+  Summary? _summary;
   String _feedback = '';
 
   void _uploadDocument() async {
@@ -20,25 +21,45 @@ class SummaryState extends State<Summary> {
       _loading = true;
     });
 
-    final summary =
-        await Summary.summarizeDocument('user_id', 'document');
+    try {
+      final summary =
+          await SummaryService.summarizeDocument('user_id', 'document');
 
-    setState(() {
-      _loading = false;
-      _summary = summary?.summary;
-    });
+      setState(() {
+        _loading = false;
+        _summary = summary;
+      });
+    } catch (e) {
+      setState(() {
+        _loading = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('Error: ${e.toString()}'),
+      ));
+    }
   }
 
   void _sendFeedback() async {
+    if (_summary == null) return;
+
     setState(() {
       _loading = true;
     });
 
-    await Summary.giveFeedback('summary_id', 'user_id', _feedback);
-
-    setState(() {
-      _loading = false;
-    });
+    try {
+      await SummaryService.giveFeedback(_summary!.id, 'user_id', _feedback);
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Feedback sent successfully'),
+      ));
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('Error: ${e.toString()}'),
+      ));
+    } finally {
+      setState(() {
+        _loading = false;
+      });
+    }
   }
 
   @override
@@ -62,7 +83,7 @@ class SummaryState extends State<Summary> {
                           children: [
                             const Text('Summary:'),
                             const SizedBox(height: 10),
-                            Text(_summary!),
+                            Text(_summary!.summaryText),
                             TextField(
                               onChanged: (value) => _feedback = value,
                               decoration: const InputDecoration(

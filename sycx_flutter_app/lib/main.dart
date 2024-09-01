@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:sycx_flutter_app/screens/auth/login.dart';
+import 'package:sycx_flutter_app/screens/auth/register.dart';
 import 'package:sycx_flutter_app/screens/home.dart';
 import 'package:sycx_flutter_app/utils/secure_storage.dart';
 import 'package:sycx_flutter_app/widgets/loading_widget.dart';
@@ -27,7 +28,7 @@ class MyApp extends StatelessWidget {
           } else if (snapshot.hasData) {
             return const Home();
           } else {
-            return const Login();
+            return const Register();
           }
         },
       ),

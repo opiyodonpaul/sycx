@@ -2,8 +2,8 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:sycx_flutter_app/utils/secure_storage.dart';
 
-class Profile {
-  static const _baseUrl = 'https://your-api-url.com';
+class ProfileService {
+  static const _baseUrl = 'https://sycx-production.up.railway.app';
 
   static Future<bool> updateProfile(
       String userId, String username, String email, String profilePic) async {
@@ -33,5 +33,19 @@ class Profile {
     );
 
     return response.statusCode == 200;
+  }
+
+  static Future<Map<String, dynamic>> getUserProfile(String userId) async {
+    final token = await SecureStorage.getToken();
+    final response = await http.get(
+      Uri.parse('$_baseUrl/user_profile?user_id=$userId'),
+      headers: {'Authorization': 'Bearer $token'},
+    );
+
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body);
+    } else {
+      throw Exception('Failed to load user profile');
+    }
   }
 }

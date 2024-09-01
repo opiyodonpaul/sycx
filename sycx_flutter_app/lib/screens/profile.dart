@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:sycx_flutter_app/services/profile.dart';
+import 'package:sycx_flutter_app/utils/pick_image.dart';
+import 'package:sycx_flutter_app/utils/convert_to_base64.dart';
 import 'package:sycx_flutter_app/widgets/animated_button.dart';
 import 'package:sycx_flutter_app/widgets/custom_textfield.dart';
 import 'package:sycx_flutter_app/widgets/loading_widget.dart';
@@ -22,25 +24,31 @@ class ProfileState extends State<Profile> {
       _loading = true;
     });
 
-    bool success = await Profile.updateProfile(
-      'user_id', // Pass user id here
-      _username,
-      _email,
-      _profilePic,
-    );
+    try {
+      bool success = await ProfileService.updateProfile(
+        'user_id', // Pass user id here
+        _username,
+        _email,
+        _profilePic,
+      );
 
-    setState(() {
-      _loading = false;
-    });
-
-    if (success) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('Profile updated successfully'),
+      if (success) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Profile updated successfully'),
+        ));
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Profile update failed'),
+        ));
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('Error: ${e.toString()}'),
       ));
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('Profile update failed'),
-      ));
+    } finally {
+      setState(() {
+        _loading = false;
+      });
     }
   }
 
@@ -53,9 +61,15 @@ class ProfileState extends State<Profile> {
           IconButton(
             icon: const Icon(Icons.delete),
             onPressed: () async {
-              bool success = await Profile.deleteAccount('user_id');
-              if (success) {
-                Navigator.pushReplacementNamed(context, '/login');
+              try {
+                bool success = await ProfileService.deleteAccount('user_id');
+                if (success) {
+                  Navigator.of(context).pushReplacementNamed('/login');
+                }
+              } catch (e) {
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                  content: Text('Error: ${e.toString()}'),
+                ));
               }
             },
           ),
@@ -82,9 +96,11 @@ class ProfileState extends State<Profile> {
                     ),
                     TextButton(
                       onPressed: () async {
-                        final file =
-                            await pickImage(); // Implement image picker
-                        _profilePic = await convertToBase64(file);
+                        final picker = PickImage();
+                        final file = await picker.pickImageFromGallery();
+                        if (file != null) {
+                          _profilePic = await convertFileToBase64(file);
+                        }
                       },
                       child: const Text('Change Profile Picture'),
                     ),
