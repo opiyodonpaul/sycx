@@ -47,3 +47,8 @@ coverage.xml
 
 # API logs
 api.log
+
+# Model checkpoints
+*.pt
+*.pth
+model_checkpoints/

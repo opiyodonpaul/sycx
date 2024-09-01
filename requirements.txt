@@ -4,5 +4,15 @@ python-dotenv
 openai
 requests
 Pillow
-tensorflow
+PyPDF2
+python-docx
+python-pptx
+scikit-learn
+numpy
+torch
+transformers
 nltk
+pytesseract
+opencv-python
+nltk
+sentencepiece

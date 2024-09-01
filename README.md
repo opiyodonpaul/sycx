@@ -108,7 +108,7 @@ python.exe -m pip install --upgrade pip
 Install the required Python packages:
 
 ```bash
-pip install -r requirements.txt
+pip install --timeout 1800 --retries 10 -r requirements.txt
 ```
 
 Run the Flask server:

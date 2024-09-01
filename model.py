@@ -1,76 +1,68 @@
-import json
-import random
 import numpy as np
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics.pairwise import cosine_similarity
+from transformers import T5Tokenizer, T5ForConditionalGeneration
+import torch
+from nltk.tokenize import sent_tokenize
 import nltk
-from nltk.stem import WordNetLemmatizer
-from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import Dense, Activation, Dropout
-from tensorflow.keras.optimizers import SGD
-import pickle
 
 nltk.download('punkt')
-nltk.download('wordnet')
 
-lemmatizer = WordNetLemmatizer()
+class SummarizationModel:
+    def __init__(self):
+        self.tokenizer = T5Tokenizer.from_pretrained('t5-small')
+        self.model = T5ForConditionalGeneration.from_pretrained('t5-small')
+        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        self.model.to(self.device)
+        self.vectorizer = TfidfVectorizer()
 
-# Load intents
-intents = json.loads(open('intents.json').read())
+    def generate_summary(self, text):
+        inputs = self.tokenizer.encode("summarize: " + text, return_tensors='pt', max_length=512, truncation=True)
+        inputs = inputs.to(self.device)
+        
+        summary_ids = self.model.generate(inputs, max_length=150, min_length=40, length_penalty=2.0, num_beams=4, early_stopping=True)
+        summary = self.tokenizer.decode(summary_ids[0], skip_special_tokens=True)
+        
+        return summary
 
-# Preprocess data
-words = []
-classes = []
-documents = []
-ignore_words = ['?', '!']
+    def improve_model(self, original_text, original_summary, feedback):
+        # Tokenize the original text and summary
+        original_sentences = sent_tokenize(original_text)
+        summary_sentences = sent_tokenize(original_summary)
+        
+        # Vectorize sentences
+        all_sentences = original_sentences + summary_sentences
+        sentence_vectors = self.vectorizer.fit_transform(all_sentences)
+        
+        # Calculate similarity between each original sentence and the summary
+        similarities = cosine_similarity(sentence_vectors[:len(original_sentences)], sentence_vectors[len(original_sentences):])
+        
+        # Find sentences that were not well represented in the summary
+        underrepresented_sentences = [sent for i, sent in enumerate(original_sentences) if np.max(similarities[i]) < 0.3]
+        
+        # Create a new training example
+        new_input = "summarize: " + " ".join(underrepresented_sentences)
+        new_target = feedback
+        
+        # Fine-tune the model on this new example
+        inputs = self.tokenizer(new_input, return_tensors="pt", max_length=512, truncation=True)
+        targets = self.tokenizer(new_target, return_tensors="pt", max_length=150, truncation=True)
+        
+        inputs = inputs.to(self.device)
+        targets = targets.to(self.device)
+        
+        self.model.train()
+        outputs = self.model(**inputs, labels=targets["input_ids"])
+        loss = outputs.loss
+        loss.backward()
+        
+        # Update model parameters
+        optimizer = torch.optim.Adam(self.model.parameters(), lr=1e-5)
+        optimizer.step()
+        
+        print(f"Model improved based on feedback. Loss: {loss.item()}")
 
-for intent in intents['intents']:
-    for pattern in intent['patterns']:
-        word_list = nltk.word_tokenize(pattern)
-        words.extend(word_list)
-        documents.append((word_list, intent['tag']))
-        if intent['tag'] not in classes:
-            classes.append(intent['tag'])
+summarization_model = SummarizationModel()
 
-words = [lemmatizer.lemmatize(w.lower()) for w in words if w not in ignore_words]
-words = sorted(set(words))
-
-classes = sorted(set(classes))
-
-pickle.dump(words, open('words.pkl', 'wb'))
-pickle.dump(classes, open('classes.pkl', 'wb'))
-
-# Prepare training data
-training = []
-output_empty = [0] * len(classes)
-
-for doc in documents:
-    bag = []
-    word_patterns = doc[0]
-    word_patterns = [lemmatizer.lemmatize(word.lower()) for word in word_patterns]
-    for word in words:
-        bag.append(1) if word in word_patterns else bag.append(0)
-    output_row = list(output_empty)
-    output_row[classes.index(doc[1])] = 1
-    training.append([bag, output_row])
-
-random.shuffle(training)
-training = np.array(training)
-
-train_x = list(training[:, 0])
-train_y = list(training[:, 1])
-
-# Build model
-model = Sequential()
-model.add(Dense(128, input_shape=(len(train_x[0]),), activation='relu'))
-model.add(Dropout(0.5))
-model.add(Dense(64, activation='relu'))
-model.add(Dropout(0.5))
-model.add(Dense(len(train_y[0]), activation='softmax'))
-
-# Compile model
-sgd = SGD(learning_rate=0.01, decay=1e-6, momentum=0.9, nesterov=True)
-model.compile(loss='categorical_crossentropy', optimizer=sgd, metrics=['accuracy'])
-
-# Train model
-hist = model.fit(np.array(train_x), np.array(train_y), epochs=200, batch_size=5, verbose=1)
-model.save('chatbot_model.h5', hist)
-print("Model trained and saved")
+def get_model():
+    return summarization_model
