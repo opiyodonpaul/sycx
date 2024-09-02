@@ -1,25 +1,26 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:sycx_flutter_app/services/api_client.dart';
 import 'package:sycx_flutter_app/utils/secure_storage.dart';
 
 class ProfileService {
-  static const _baseUrl = 'https://sycx-production.up.railway.app';
+  static final ApiClient _apiClient = ApiClient(httpClient: http.Client());
 
   static Future<bool> updateProfile(
       String userId, String username, String email, String profilePic) async {
     final token = await SecureStorage.getToken();
-    final response = await http.put(
-      Uri.parse('$_baseUrl/update_profile'),
+    final response = await _apiClient.put(
+      '/update_profile',
       headers: {
         'Authorization': 'Bearer $token',
-        'Content-Type': 'application/json'
       },
-      body: jsonEncode({
+      body: {
         'user_id': userId,
         'username': username,
         'email': email,
         'profile_pic': profilePic
-      }),
+      },
+      authRequired: true,
     );
 
     return response.statusCode == 200;
@@ -27,9 +28,10 @@ class ProfileService {
 
   static Future<bool> deleteAccount(String userId) async {
     final token = await SecureStorage.getToken();
-    final response = await http.delete(
-      Uri.parse('$_baseUrl/delete_account?user_id=$userId'),
+    final response = await _apiClient.delete(
+      '/delete_account?user_id=$userId',
       headers: {'Authorization': 'Bearer $token'},
+      authRequired: true,
     );
 
     return response.statusCode == 200;
@@ -37,9 +39,10 @@ class ProfileService {
 
   static Future<Map<String, dynamic>> getUserProfile(String userId) async {
     final token = await SecureStorage.getToken();
-    final response = await http.get(
-      Uri.parse('$_baseUrl/user_profile?user_id=$userId'),
+    final response = await _apiClient.get(
+      '/user_profile?user_id=$userId',
       headers: {'Authorization': 'Bearer $token'},
+      authRequired: true,
     );
 
     if (response.statusCode == 200) {

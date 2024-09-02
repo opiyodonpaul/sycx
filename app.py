@@ -2,9 +2,10 @@ from flask import Flask, request, jsonify, send_file
 from pymongo import MongoClient
 from dotenv import load_dotenv
 import os
+import uuid
 from summarizer import summarize_document, save_feedback, retrieve_summary, download_summary_file, delete_summary
 from model import get_model
-import uuid
+from werkzeug.security import generate_password_hash, check_password_hash
 from io import BytesIO
 
 # Load environment variables
@@ -16,10 +17,115 @@ app.secret_key = os.getenv('FLASK_SECRET_KEY')
 # MongoDB configuration
 client = MongoClient(os.getenv('MONGODB_URI'))
 db = client['sycx']
+users_collection = db['users']
 summaries_collection = db['summaries']
 
 # Get the summarization model
 summarization_model = get_model()
+
+@app.route('/register', methods=['POST'])
+def register():
+    data = request.json
+    email = data.get('email')
+    username = data.get('username')
+    password = data.get('password')
+    profile_pic = data.get('profile_pic')
+
+    if not email or not username or not password:
+        return jsonify({'error': 'Missing required fields'}), 400
+
+    if users_collection.find_one({'email': email}):
+        return jsonify({'error': 'User already exists'}), 400
+
+    hashed_password = generate_password_hash(password)
+    user_id = str(uuid.uuid4())
+
+    users_collection.insert_one({
+        '_id': user_id,
+        'username': username,
+        'email': email,
+        'password': hashed_password,
+        'profile_pic': profile_pic
+    })
+
+    return jsonify({'message': 'User registered successfully', 'user_id': user_id})
+
+@app.route('/login', methods=['POST'])
+def login():
+    data = request.json
+    email = data.get('email')
+    password = data.get('password')
+
+    if not email or not password:
+        return jsonify({'error': 'Missing required fields'}), 400
+
+    user = users_collection.find_one({'email': email})
+    if not user or not check_password_hash(user['password'], password):
+        return jsonify({'error': 'Invalid email or password'}), 400
+
+    return jsonify({'message': 'Login successful', 'user_id': user['_id']})
+
+@app.route('/reset_password', methods=['POST'])
+def reset_password():
+    data = request.json
+    email = data.get('email')
+
+    if not email:
+        return jsonify({'error': 'Missing email'}), 400
+
+    user = users_collection.find_one({'email': email})
+    if not user:
+        return jsonify({'error': 'User not found'}), 404
+
+    # In a real application, this token should be sent via email
+    reset_token = str(uuid.uuid4())
+    users_collection.update_one({'_id': user['_id']}, {'$set': {'reset_token': reset_token}})
+
+    return jsonify({'message': 'Password reset token generated', 'reset_token': reset_token})
+
+@app.route('/confirm_reset_password', methods=['POST'])
+def confirm_reset_password():
+    data = request.json
+    reset_token = data.get('token')
+    new_password = data.get('new_password')
+
+    user = users_collection.find_one({'reset_token': reset_token})
+    if not user:
+        return jsonify({'error': 'Invalid or expired token'}), 400
+
+    hashed_password = generate_password_hash(new_password)
+    users_collection.update_one({'_id': user['_id']}, {'$set': {'password': hashed_password, 'reset_token': None}})
+
+    return jsonify({'message': 'Password reset successful'})
+
+@app.route('/update_profile', methods=['PUT'])
+def update_profile():
+    data = request.json
+    user_id = data.get('user_id')
+    username = data.get('username')
+    email = data.get('email')
+    profile_pic = data.get('profile_pic')
+
+    if not user_id:
+        return jsonify({'error': 'User ID is required'}), 400
+
+    users_collection.update_one(
+        {'_id': user_id},
+        {'$set': {'username': username, 'email': email, 'profile_pic': profile_pic}}
+    )
+
+    return jsonify({'message': 'Profile updated successfully'})
+
+@app.route('/delete_account', methods=['DELETE'])
+def delete_account():
+    user_id = request.args.get('user_id')
+    if not user_id:
+        return jsonify({'error': 'User ID is required'}), 400
+
+    summaries_collection.delete_many({'user_id': user_id})
+    users_collection.delete_one({'_id': user_id})
+
+    return jsonify({'message': 'Account and all associated data deleted successfully'})
 
 @app.route('/summarize', methods=['POST'])
 def summarize():

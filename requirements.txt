@@ -14,5 +14,4 @@ transformers
 nltk
 pytesseract
 opencv-python
-nltk
 sentencepiece

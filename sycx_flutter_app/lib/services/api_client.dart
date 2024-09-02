@@ -12,6 +12,7 @@ class ApiClient {
     String endpoint, {
     Map<String, String>? headers,
     dynamic body,
+    Future<http.MultipartFile>? file,
     bool authRequired = false,
   }) async {
     final uri = Uri.parse('$baseUrl$endpoint');
@@ -20,14 +21,22 @@ class ApiClient {
       defaultHeaders.addAll(headers);
     }
 
-    final response = await httpClient.post(
-      uri,
-      headers: defaultHeaders,
-      body: jsonEncode(body),
-    );
+    final request = http.MultipartRequest('POST', uri);
+    request.headers.addAll(defaultHeaders);
 
-    _handleErrors(response);
-    return response;
+    if (body != null) {
+      request.fields['body'] = jsonEncode(body);
+    }
+
+    if (file != null) {
+      request.files.add(await file);
+    }
+
+    final response = await httpClient.send(request);
+    final responseBody = await response.stream.bytesToString();
+
+    _handleErrors(response as http.Response);
+    return http.Response(responseBody, response.statusCode);
   }
 
   Future<http.Response> get(
