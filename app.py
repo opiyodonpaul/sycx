@@ -2,7 +2,6 @@ from flask import Flask, request, jsonify, send_file
 from pymongo import MongoClient
 from dotenv import load_dotenv
 import os
-import uuid
 from summarizer import summarize_document, save_feedback, retrieve_summary, download_summary_file, delete_summary
 from model import get_model
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -25,31 +24,30 @@ summarization_model = get_model()
 
 @app.route('/register', methods=['POST'])
 def register():
-    if 'profile_pic' not in request.files or not request.form:
+    if 'profile_pic' not in request.form or not request.form:
         return jsonify({'error': 'Missing profile picture or form data'}), 400
 
     email = request.form.get('email')
     username = request.form.get('username')
     password = request.form.get('password')
-    profile_pic_file = request.files['profile_pic']
+    profile_pic_base64 = request.form.get('profile_pic')
 
-    if not email or not username or not password:
+    if not email or not username or not password or not profile_pic_base64:
         return jsonify({'error': 'Missing required fields'}), 400
 
     if users_collection.find_one({'email': email}):
         return jsonify({'error': 'User already exists'}), 400
 
-    profile_pic_base64 = base64.b64encode(profile_pic_file.read()).decode('utf-8')
     hashed_password = generate_password_hash(password)
 
-    users_collection.insert_one({
+    result = users_collection.insert_one({
         'username': username,
         'email': email,
         'password': hashed_password,
         'profile_pic': profile_pic_base64
     })
 
-    return jsonify({'message': 'User registered successfully', 'user_id': user_id})
+    return jsonify({'message': 'User registered successfully', 'user_id': str(result.inserted_id)})
 
 @app.route('/login', methods=['POST'])
 def login():
@@ -64,7 +62,7 @@ def login():
     if not user or not check_password_hash(user['password'], password):
         return jsonify({'error': 'Invalid email or password'}), 400
 
-    return jsonify({'message': 'Login successful', 'user_id': user['_id']})
+    return jsonify({'message': 'Login successful', 'user_id': str(user['_id'])})
 
 @app.route('/reset_password', methods=['POST'])
 def reset_password():
