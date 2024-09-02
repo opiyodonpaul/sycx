@@ -25,7 +25,9 @@ class ApiClient {
     request.headers.addAll(defaultHeaders);
 
     if (body != null) {
-      request.fields['body'] = jsonEncode(body);
+      body.forEach((key, value) {
+        request.fields[key] = value;
+      });
     }
 
     if (file != null) {
@@ -35,7 +37,7 @@ class ApiClient {
     final response = await httpClient.send(request);
     final responseBody = await response.stream.bytesToString();
 
-    _handleErrors(response as http.Response);
+    _handleErrors(http.Response(responseBody, response.statusCode));
     return http.Response(responseBody, response.statusCode);
   }
 

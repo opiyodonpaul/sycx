@@ -25,11 +25,13 @@ summarization_model = get_model()
 
 @app.route('/register', methods=['POST'])
 def register():
-    data = request.json
-    email = data.get('email')
-    username = data.get('username')
-    password = data.get('password')
-    profile_pic = data.get('profile_pic')
+    if 'profile_pic' not in request.files or not request.form:
+        return jsonify({'error': 'Missing profile picture or form data'}), 400
+
+    email = request.form.get('email')
+    username = request.form.get('username')
+    password = request.form.get('password')
+    profile_pic_file = request.files['profile_pic']
 
     if not email or not username or not password:
         return jsonify({'error': 'Missing required fields'}), 400
@@ -37,15 +39,14 @@ def register():
     if users_collection.find_one({'email': email}):
         return jsonify({'error': 'User already exists'}), 400
 
+    profile_pic_base64 = base64.b64encode(profile_pic_file.read()).decode('utf-8')
     hashed_password = generate_password_hash(password)
-    user_id = str(uuid.uuid4())
 
     users_collection.insert_one({
-        '_id': user_id,
         'username': username,
         'email': email,
         'password': hashed_password,
-        'profile_pic': profile_pic
+        'profile_pic': profile_pic_base64
     })
 
     return jsonify({'message': 'User registered successfully', 'user_id': user_id})

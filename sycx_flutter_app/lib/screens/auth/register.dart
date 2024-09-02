@@ -45,6 +45,17 @@ class RegisterState extends State<Register> {
     }
   }
 
+  void _selectProfilePicture() async {
+    final picker = PickImage();
+    final File? selectedImage = await picker.pickImageFromGallery();
+    if (selectedImage != null) {
+      final base64Image = await convertFileToBase64(selectedImage);
+      setState(() {
+        _profilePic = base64Image;
+      });
+    }
+  }
+
   void _googleSignIn() async {
     setState(() {
       _loading = true;
@@ -117,11 +128,7 @@ class RegisterState extends State<Register> {
                           value!.isEmpty ? 'Enter a password' : null,
                     ),
                     TextButton(
-                      onPressed: () async {
-                        final file =
-                            PickImage(); // Implement image picker
-                        _profilePic = await convertFileToBase64(file as File);
-                      },
+                      onPressed: _selectProfilePicture,
                       child: const Text('Upload Profile Picture'),
                     ),
                     const SizedBox(height: 20),
