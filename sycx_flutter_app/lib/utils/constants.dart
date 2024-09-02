@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
-const String baseUrl = 'https://sycx.up.railway.app';
+final String baseUrl = dotenv.env['FLASK_URL']!;
 
 // Colors
 const Color primaryColor = Color(0xFF0A0E21);

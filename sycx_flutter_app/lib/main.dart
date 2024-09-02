@@ -4,8 +4,16 @@ import 'package:sycx_flutter_app/screens/auth/register.dart';
 import 'package:sycx_flutter_app/screens/home.dart';
 import 'package:sycx_flutter_app/utils/secure_storage.dart';
 import 'package:sycx_flutter_app/widgets/loading_widget.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
-void main() {
+void main() async {
+  // Ensure that the Flutter binding is initialized
+  WidgetsFlutterBinding.ensureInitialized();
+
+  // Load environment variables from the .env file
+  await dotenv.load(fileName: ".env");
+
+  // Run the app
   runApp(const MyApp());
 }
 
