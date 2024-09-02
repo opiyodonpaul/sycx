@@ -20,6 +20,7 @@ class RegisterState extends State<Register> {
   String _email = '';
   String _password = '';
   String _profilePic = '';
+  File? _selectedImage;
   bool _loading = false;
 
   void _register() async {
@@ -52,6 +53,7 @@ class RegisterState extends State<Register> {
       final base64Image = await convertFileToBase64(selectedImage);
       setState(() {
         _profilePic = base64Image;
+        _selectedImage = selectedImage;
       });
     }
   }
@@ -131,6 +133,13 @@ class RegisterState extends State<Register> {
                       onPressed: _selectProfilePicture,
                       child: const Text('Upload Profile Picture'),
                     ),
+                    if (_selectedImage != null)
+                      Image.file(
+                        _selectedImage!,
+                        width: 100,
+                        height: 100,
+                        fit: BoxFit.cover,
+                      ),
                     const SizedBox(height: 20),
                     AnimatedButton(
                       text: 'Register',
