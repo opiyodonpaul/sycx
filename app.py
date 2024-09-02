@@ -14,6 +14,7 @@ app = Flask(__name__)
 app.secret_key = os.getenv('FLASK_SECRET_KEY')
 
 # MongoDB configuration
+print("MONGODB_URI:", os.getenv('MONGODB_URI'))
 client = MongoClient(os.getenv('MONGODB_URI'))
 db = client['sycx']
 users_collection = db['users']
@@ -24,30 +25,42 @@ summarization_model = get_model()
 
 @app.route('/register', methods=['POST'])
 def register():
-    if 'profile_pic' not in request.form or not request.form:
-        return jsonify({'error': 'Missing profile picture or form data'}), 400
+    try:
+        if 'profile_pic' not in request.form or not request.form:
+            return jsonify({'error': 'Missing profile picture or form data'}), 400
 
-    email = request.form.get('email')
-    username = request.form.get('username')
-    password = request.form.get('password')
-    profile_pic_base64 = request.form.get('profile_pic')
+        email = request.form.get('email')
+        username = request.form.get('username')
+        password = request.form.get('password')
+        profile_pic_base64 = request.form.get('profile_pic')
 
-    if not email or not username or not password or not profile_pic_base64:
-        return jsonify({'error': 'Missing required fields'}), 400
+        if not email or not username or not password or not profile_pic_base64:
+            return jsonify({'error': 'Missing required fields'}), 400
 
-    if users_collection.find_one({'email': email}):
-        return jsonify({'error': 'User already exists'}), 400
+        # Try to find the user in the database
+        try:
+            user = users_collection.find_one({'email': email})
+        except Exception as e:
+            print(f"MongoDB access error: {e}")
+            return jsonify({'error': 'Database connection error'}), 500
 
-    hashed_password = generate_password_hash(password)
+        if user:
+            return jsonify({'error': 'User already exists'}), 400
 
-    result = users_collection.insert_one({
-        'username': username,
-        'email': email,
-        'password': hashed_password,
-        'profile_pic': profile_pic_base64
-    })
+        hashed_password = generate_password_hash(password)
 
-    return jsonify({'message': 'User registered successfully', 'user_id': str(result.inserted_id)})
+        result = users_collection.insert_one({
+            'username': username,
+            'email': email,
+            'password': hashed_password,
+            'profile_pic': profile_pic_base64
+        })
+
+        return jsonify({'message': 'User registered successfully', 'user_id': str(result.inserted_id)})
+
+    except Exception as e:
+        print(f"An error occurred: {e}")
+        return jsonify({'error': 'Internal server error'}), 500
 
 @app.route('/login', methods=['POST'])
 def login():
