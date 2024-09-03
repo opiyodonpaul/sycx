@@ -1,34 +1,64 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:google_fonts/google_fonts.dart';
 
-final String baseUrl = dotenv.env['FLASK_URL']!;
+const String baseUrl = 'http://10.0.2.2:5000';
 
-// Colors
-const Color primaryColor = Color(0xFF0A0E21);
-const Color accentColor = Color(0xFFEB1555);
-const Color lightBackgroundColor = Color(0xFFF5F5F5);
+class AppColors {
+  static const Color gradientStart = Color(0xFF6A11CB);
+  static const Color gradientMiddle = Color(0xFFBC4E9C);
+  static const Color gradientEnd = Color(0xFFF56565);
 
-// Text Styles
-const TextStyle headingTextStyle = TextStyle(
-  fontSize: 22,
-  fontWeight: FontWeight.bold,
-  color: primaryColor,
-);
+  static const Color primaryButtonColor = Color(0xFF3498DB);
+  static const Color secondaryButtonColor = Color(0xFF2C3E50);
+  static const Color primaryButtonTextColor = Colors.white;
+  static const Color secondaryButtonTextColor = Colors.white;
 
-const TextStyle subheadingTextStyle = TextStyle(
-  fontSize: 18,
-  fontWeight: FontWeight.w600,
-  color: primaryColor,
-);
+  static const Color textFieldBorderColor = Color(0xFF4A5568);
+  static const Color textFieldFillColor = Color(0xFF2D3748);
 
-const TextStyle bodyTextStyle = TextStyle(
-  fontSize: 16,
-  color: Colors.black87,
-);
+  static const Color primaryTextColor = Colors.white;
+  static const Color secondaryTextColor = Color(0xFFA0AEC0);
+  static const Color altPriTextColor = Color(0xFFD0D8E0);
+}
 
-// Padding and Margins
+class AppTextStyles {
+  static final TextStyle headingStyleWithShadow = GoogleFonts.exo2(
+    fontSize: 32,
+    fontWeight: FontWeight.bold,
+    color: AppColors.primaryTextColor,
+    shadows: [
+      Shadow(
+        blurRadius: 10.0,
+        color: Colors.black.withOpacity(0.3),
+        offset: const Offset(0, 5),
+      ),
+    ],
+  );
+
+  static final TextStyle headingStyleNoShadow = GoogleFonts.exo2(
+    fontSize: 32,
+    fontWeight: FontWeight.bold,
+    color: AppColors.primaryTextColor,
+  );
+
+  static final TextStyle subheadingStyle = GoogleFonts.exo2(
+    fontSize: 18,
+    fontWeight: FontWeight.w500,
+    color: AppColors.altPriTextColor,
+  );
+
+  static final TextStyle buttonTextStyle = GoogleFonts.exo2(
+    fontSize: 18,
+    fontWeight: FontWeight.w600,
+    color: Colors.white,
+  );
+
+  static final TextStyle bodyTextStyle = GoogleFonts.exo2(
+    fontSize: 16,
+    color: AppColors.primaryTextColor,
+  );
+}
+
 const double defaultPadding = 16.0;
 const double defaultMargin = 16.0;
-
-// Duration
 const Duration animationDuration = Duration(milliseconds: 300);

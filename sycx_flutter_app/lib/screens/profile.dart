@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:sycx_flutter_app/services/profile.dart';
+import 'package:sycx_flutter_app/utils/constants.dart';
 import 'package:sycx_flutter_app/utils/pick_image.dart';
 import 'package:sycx_flutter_app/utils/convert_to_base64.dart';
 import 'package:sycx_flutter_app/widgets/animated_button.dart';
@@ -108,6 +109,8 @@ class ProfileState extends State<Profile> {
                     AnimatedButton(
                       text: 'Update Profile',
                       onPressed: _updateProfile,
+                      backgroundColor: AppColors.secondaryButtonColor,
+                      textColor: AppColors.secondaryButtonTextColor,
                     ),
                   ],
                 ),

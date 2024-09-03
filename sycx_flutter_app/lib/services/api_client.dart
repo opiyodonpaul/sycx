@@ -11,8 +11,8 @@ class ApiClient {
   Future<http.Response> post(
     String endpoint, {
     Map<String, String>? headers,
-    dynamic body,
-    Future<http.MultipartFile>? file,
+    Map<String, dynamic>? body,
+    http.MultipartFile? file,
     bool authRequired = false,
   }) async {
     final uri = Uri.parse('$baseUrl$endpoint');
@@ -21,24 +21,29 @@ class ApiClient {
       defaultHeaders.addAll(headers);
     }
 
-    final request = http.MultipartRequest('POST', uri);
-    request.headers.addAll(defaultHeaders);
+    if (defaultHeaders['Content-Type'] == 'application/json') {
+      final jsonBody = jsonEncode(body);
+      return await httpClient.post(
+        uri,
+        headers: defaultHeaders,
+        body: jsonBody,
+      );
+    } else {
+      final request = http.MultipartRequest('POST', uri);
+      request.headers.addAll(defaultHeaders);
 
-    if (body != null) {
-      body.forEach((key, value) {
-        request.fields[key] = value;
-      });
+      if (body != null) {
+        request.fields
+            .addAll(body.map((key, value) => MapEntry(key, value.toString())));
+      }
+
+      if (file != null) {
+        request.files.add(file);
+      }
+
+      final streamedResponse = await request.send();
+      return await http.Response.fromStream(streamedResponse);
     }
-
-    if (file != null) {
-      request.files.add(await file);
-    }
-
-    final response = await httpClient.send(request);
-    final responseBody = await response.stream.bytesToString();
-
-    _handleErrors(http.Response(responseBody, response.statusCode));
-    return http.Response(responseBody, response.statusCode);
   }
 
   Future<http.Response> get(
@@ -105,7 +110,6 @@ class ApiClient {
 
   Future<Map<String, String>> _getHeaders(bool authRequired) async {
     Map<String, String> headers = {
-      'Content-Type': 'application/json',
       'Accept': 'application/json',
     };
 

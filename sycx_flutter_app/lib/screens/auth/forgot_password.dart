@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:sycx_flutter_app/services/auth.dart';
+import 'package:sycx_flutter_app/utils/constants.dart';
 import 'package:sycx_flutter_app/widgets/animated_button.dart';
 import 'package:sycx_flutter_app/widgets/custom_textfield.dart';
 import 'package:sycx_flutter_app/widgets/loading_widget.dart';
@@ -64,6 +65,8 @@ class ForgotPasswordState extends State<ForgotPassword> {
                     AnimatedButton(
                       text: 'Send Reset Link',
                       onPressed: _resetPassword,
+                      backgroundColor: AppColors.secondaryButtonColor,
+                      textColor: AppColors.secondaryButtonTextColor,
                     ),
                   ],
                 ),
