@@ -65,15 +65,15 @@ def register():
 @app.route('/login', methods=['POST'])
 def login():
     data = request.json
-    email = data.get('email')
+    username = data.get('username')
     password = data.get('password')
 
-    if not email or not password:
+    if not username or not password:
         return jsonify({'error': 'Missing required fields'}), 400
 
-    user = users_collection.find_one({'email': email})
+    user = users_collection.find_one({'username': username})
     if not user or not check_password_hash(user['password'], password):
-        return jsonify({'error': 'Invalid email or password'}), 400
+        return jsonify({'error': 'Invalid username or password'}), 400
 
     return jsonify({'message': 'Login successful', 'user_id': str(user['_id'])})
 

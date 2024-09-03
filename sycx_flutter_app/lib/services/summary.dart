@@ -10,7 +10,7 @@ class SummaryService {
   static Future<Summary> summarizeDocument(
       String userId, dynamic document) async {
     final token = await SecureStorage.getToken();
-    final file = http.MultipartFile.fromPath('document', document.path);
+    final file = await http.MultipartFile.fromPath('document', document.path);
     final response = await _apiClient.post(
       '/summarize',
       headers: {
