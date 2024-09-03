@@ -10,6 +10,7 @@ class Auth {
     final response = await _apiClient.post(
       '/login',
       body: {'username': username, 'password': password},
+      headers: {'Content-Type': 'application/json'},
     );
 
     if (response.statusCode == 200) {
@@ -38,6 +39,28 @@ class Auth {
       return true;
     }
     return false;
+  }
+
+  static Future<bool> resetPassword(String email) async {
+    final response = await _apiClient.post(
+      '/reset_password',
+      body: {'email': email},
+    );
+
+    return response.statusCode == 200;
+  }
+
+  static Future<bool> confirmResetPassword(
+      String token, String newPassword) async {
+    final response = await _apiClient.post(
+      '/confirm_reset_password',
+      body: {
+        'token': token,
+        'new_password': newPassword,
+      },
+    );
+
+    return response.statusCode == 200;
   }
 
   static Future<void> logout() async {

@@ -29,7 +29,12 @@ class SplashState extends State<Splash> {
   Widget build(BuildContext context) {
     return const Scaffold(
       body: Center(
-        child: CircularProgressIndicator(),
+        child: Column(
+          children: [
+            CircularProgressIndicator(),
+            Text('Splash Screen'),
+          ],
+        ),
       ),
     );
   }
