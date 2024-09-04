@@ -4,6 +4,7 @@ import 'package:fluttertoast/fluttertoast.dart';
 import 'package:sycx_flutter_app/utils/constants.dart';
 import 'package:sycx_flutter_app/widgets/custom_textfield.dart';
 import 'package:sycx_flutter_app/widgets/animated_button.dart';
+import 'package:sycx_flutter_app/widgets/loading.dart';
 
 class Login extends StatefulWidget {
   const Login({super.key});
@@ -19,10 +20,13 @@ class LoginState extends State<Login> {
   String _username = '';
   String _password = '';
   bool _obscurePassword = true;
+  bool _isLoading = false; // Add this line
 
   void _login() async {
     if (_formKey.currentState!.validate()) {
+      setState(() => _isLoading = true); // Add this line
       bool success = await Auth.login(_username, _password);
+      setState(() => _isLoading = false); // Add this line
       if (success) {
         Navigator.pushReplacementNamed(context, '/home');
       } else {
@@ -53,117 +57,139 @@ class LoginState extends State<Login> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: RefreshIndicator(
-        onRefresh: _handleRefresh,
-        child: SingleChildScrollView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          child: Container(
-            height: MediaQuery.of(context).size.height,
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  AppColors.gradientStart,
-                  AppColors.gradientMiddle,
-                  AppColors.gradientEnd,
-                ],
-              ),
-            ),
-            child: SafeArea(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 24.0),
-                child: Form(
-                  key: _formKey,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                      const SizedBox(height: 60),
-                      Center(
-                        child: Text(
-                          'Welcome Back',
-                          style: AppTextStyles.headingStyleWithShadow,
-                          textAlign: TextAlign.center,
-                        ),
+    return PopScope(
+      canPop: false,
+      onPopInvoked: (bool didPop) {
+        if (!didPop) {
+          Navigator.pushReplacementNamed(context, '/welcome');
+        }
+      },
+      child: Scaffold(
+        body: _isLoading // Add this line
+            ? const Loading() // Add this line
+            : RefreshIndicator(
+                onRefresh: _handleRefresh,
+                child: SingleChildScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  child: Container(
+                    height: MediaQuery.of(context).size.height,
+                    decoration: const BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [
+                          AppColors.gradientStart,
+                          AppColors.gradientMiddle,
+                          AppColors.gradientEnd,
+                        ],
                       ),
-                      const SizedBox(height: 20),
-                      Center(
-                        child: Text(
-                          'Login to continue summarizing the world.',
-                          style: AppTextStyles.subheadingStyle,
-                          textAlign: TextAlign.center,
-                        ),
-                      ),
-                      const SizedBox(height: 60),
-                      CustomTextField(
-                        hintText: 'Username',
-                        onChanged: (value) => _username = value,
-                        validator: (value) =>
-                            value!.isEmpty ? 'Enter username' : null,
-                        focusNode: _usernameFocusNode,
-                        onFieldSubmitted: (_) {
-                          FocusScope.of(context)
-                              .requestFocus(_passwordFocusNode);
-                        },
-                        prefixIcon: Icons.person,
-                      ),
-                      const SizedBox(height: 16),
-                      CustomTextField(
-                        hintText: 'Password',
-                        obscureText: _obscurePassword,
-                        onChanged: (value) => _password = value,
-                        validator: (value) =>
-                            value!.isEmpty ? 'Enter password' : null,
-                        focusNode: _passwordFocusNode,
-                        onFieldSubmitted: (_) => _login(),
-                        prefixIcon: Icons.lock,
-                        suffixIcon: IconButton(
-                          icon: Icon(
-                            _obscurePassword
-                                ? Icons.visibility_off
-                                : Icons.visibility,
-                            color: AppColors.secondaryTextColor,
+                    ),
+                    child: SafeArea(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 24.0),
+                        child: Form(
+                          key: _formKey,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            children: [
+                              const SizedBox(height: 60),
+                              Center(
+                                child: Text(
+                                  'Welcome Back',
+                                  style: AppTextStyles.headingStyleWithShadow,
+                                  textAlign: TextAlign.center,
+                                ),
+                              ),
+                              const SizedBox(height: 20),
+                              Center(
+                                child: Text(
+                                  'Login to continue summarizing the world.',
+                                  style: AppTextStyles.subheadingStyle,
+                                  textAlign: TextAlign.center,
+                                ),
+                              ),
+                              const SizedBox(height: 60),
+                              CustomTextField(
+                                hintText: 'Username',
+                                onChanged: (value) => _username = value,
+                                validator: (value) =>
+                                    value!.isEmpty ? 'Enter username' : null,
+                                focusNode: _usernameFocusNode,
+                                onFieldSubmitted: (_) {
+                                  FocusScope.of(context)
+                                      .requestFocus(_passwordFocusNode);
+                                },
+                                prefixIcon: Icons.person,
+                              ),
+                              const SizedBox(height: 16),
+                              CustomTextField(
+                                hintText: 'Password',
+                                obscureText: _obscurePassword,
+                                onChanged: (value) => _password = value,
+                                validator: (value) =>
+                                    value!.isEmpty ? 'Enter password' : null,
+                                focusNode: _passwordFocusNode,
+                                onFieldSubmitted: (_) => _login(),
+                                prefixIcon: Icons.lock,
+                                suffixIcon: IconButton(
+                                  icon: Icon(
+                                    _obscurePassword
+                                        ? Icons.visibility_off
+                                        : Icons.visibility,
+                                    color: AppColors.secondaryTextColor,
+                                  ),
+                                  onPressed: () {
+                                    setState(() {
+                                      _obscurePassword = !_obscurePassword;
+                                    });
+                                  },
+                                ),
+                              ),
+                              const SizedBox(height: 16),
+                              Center(
+                                child: TextButton(
+                                  onPressed: () {
+                                    Navigator.pushReplacementNamed(
+                                        context, '/forgot_password');
+                                  },
+                                  child: Text(
+                                    'Forgot Password?',
+                                    style: AppTextStyles.bodyTextStyle.copyWith(
+                                      color: AppColors.primaryTextColor,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 24),
+                              AnimatedButton(
+                                text: 'Login',
+                                onPressed: _login,
+                                backgroundColor: AppColors.primaryButtonColor,
+                                textColor: AppColors.primaryButtonTextColor,
+                              ),
+                              const SizedBox(height: 16),
+                              Center(
+                                child: TextButton(
+                                  onPressed: () {
+                                    Navigator.pushReplacementNamed(
+                                        context, '/register');
+                                  },
+                                  child: Text(
+                                    'Don\'t have an account? Sign up',
+                                    style: AppTextStyles.bodyTextStyle.copyWith(
+                                      color: AppColors.primaryTextColor,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
-                          onPressed: () {
-                            setState(() {
-                              _obscurePassword = !_obscurePassword;
-                            });
-                          },
                         ),
                       ),
-                      const SizedBox(height: 24),
-                      AnimatedButton(
-                        text: 'Login',
-                        onPressed: _login,
-                        backgroundColor: AppColors.primaryButtonColor,
-                        textColor: AppColors.primaryButtonTextColor,
-                      ),
-                      const SizedBox(height: 16),
-                      Center(
-                        child: TextButton(
-                          onPressed: () {
-                            Navigator.pushNamedAndRemoveUntil(
-                              context,
-                              '/register',
-                              (route) => route.settings.name == '/welcome',
-                            );
-                          },
-                          child: Text(
-                            'Don\'t have an account? Sign up',
-                            style: AppTextStyles.bodyTextStyle.copyWith(
-                              color: AppColors.primaryTextColor,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
+                    ),
                   ),
                 ),
               ),
-            ),
-          ),
-        ),
       ),
     );
   }

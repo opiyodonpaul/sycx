@@ -43,7 +43,7 @@ class Auth {
 
   static Future<bool> resetPassword(String email) async {
     final response = await _apiClient.post(
-      '/reset_password',
+      '/forgot_password',
       body: {'email': email},
     );
 
@@ -53,7 +53,7 @@ class Auth {
   static Future<bool> confirmResetPassword(
       String token, String newPassword) async {
     final response = await _apiClient.post(
-      '/confirm_reset_password',
+      '/reset_password',
       body: {
         'token': token,
         'new_password': newPassword,
