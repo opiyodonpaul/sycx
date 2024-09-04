@@ -5,7 +5,7 @@ import 'package:sycx_flutter_app/utils/pick_image.dart';
 import 'package:sycx_flutter_app/utils/convert_to_base64.dart';
 import 'package:sycx_flutter_app/widgets/animated_button.dart';
 import 'package:sycx_flutter_app/widgets/custom_textfield.dart';
-import 'package:sycx_flutter_app/widgets/loading_widget.dart';
+import 'package:sycx_flutter_app/widgets/loading.dart';
 
 class Profile extends StatefulWidget {
   const Profile({super.key});

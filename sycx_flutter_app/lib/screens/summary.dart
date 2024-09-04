@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:sycx_flutter_app/models/summary.dart';
 import 'package:sycx_flutter_app/services/summary.dart';
-import 'package:sycx_flutter_app/widgets/loading_widget.dart';
+import 'package:sycx_flutter_app/widgets/loading.dart';
 
 class SummaryScreen extends StatefulWidget {
   const SummaryScreen({super.key});

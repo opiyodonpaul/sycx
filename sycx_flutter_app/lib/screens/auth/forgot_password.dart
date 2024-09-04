@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:sycx_flutter_app/services/auth.dart';
+import 'package:fluttertoast/fluttertoast.dart';
 import 'package:sycx_flutter_app/utils/constants.dart';
-import 'package:sycx_flutter_app/widgets/animated_button.dart';
 import 'package:sycx_flutter_app/widgets/custom_textfield.dart';
-import 'package:sycx_flutter_app/widgets/loading_widget.dart';
+import 'package:sycx_flutter_app/widgets/animated_button.dart';
+import 'package:sycx_flutter_app/widgets/loading.dart';
 
 class ForgotPassword extends StatefulWidget {
   const ForgotPassword({super.key});
@@ -14,64 +15,140 @@ class ForgotPassword extends StatefulWidget {
 
 class ForgotPasswordState extends State<ForgotPassword> {
   final _formKey = GlobalKey<FormState>();
+  final _emailFocusNode = FocusNode();
   String _email = '';
-  bool _loading = false;
+  bool _isLoading = false; // Add this line
 
   void _resetPassword() async {
-    if (!_formKey.currentState!.validate()) return;
-
-    setState(() {
-      _loading = true;
-    });
-
-    bool success = await Auth.resetPassword(_email);
-
-    setState(() {
-      _loading = false;
-    });
-
-    if (success) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('Password reset link sent to your email'),
-      ));
-      Navigator.pop(context);
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('Failed to send password reset link'),
-      ));
+    if (_formKey.currentState!.validate()) {
+      setState(() => _isLoading = true); // Add this line
+      bool success = await Auth.resetPassword(_email);
+      setState(() => _isLoading = false); // Add this line
+      if (success) {
+        Fluttertoast.showToast(
+          msg: "Password reset link sent to your email",
+          toastLength: Toast.LENGTH_SHORT,
+          gravity: ToastGravity.BOTTOM,
+        );
+        Navigator.pop(context);
+      } else {
+        Fluttertoast.showToast(
+          msg: "Failed to send password reset link",
+          toastLength: Toast.LENGTH_SHORT,
+          gravity: ToastGravity.BOTTOM,
+        );
+      }
     }
+  }
+
+  Future<void> _handleRefresh() async {
+    setState(() {
+      _formKey.currentState?.reset();
+      _email = '';
+    });
+    return Future.delayed(const Duration(seconds: 1));
+  }
+
+  @override
+  void dispose() {
+    _emailFocusNode.dispose();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Forgot Password')),
-      body: _loading
-          ? const Loading()
-          : Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Form(
-                key: _formKey,
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    CustomTextField(
-                      hintText: 'Email',
-                      onChanged: (value) => _email = value,
-                      validator: (value) =>
-                          value!.isEmpty ? 'Enter an email' : null,
+    return PopScope(
+      canPop: false,
+      onPopInvoked: (bool didPop) {
+        if (!didPop) {
+          Navigator.pushReplacementNamed(context, '/login');
+        }
+      },
+      child: Scaffold(
+        body: _isLoading // Add this line
+            ? const Loading() // Add this line
+            : RefreshIndicator(
+                onRefresh: _handleRefresh,
+                child: SingleChildScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  child: Container(
+                    height: MediaQuery.of(context).size.height,
+                    decoration: const BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [
+                          AppColors.gradientStart,
+                          AppColors.gradientMiddle,
+                          AppColors.gradientEnd,
+                        ],
+                      ),
                     ),
-                    const SizedBox(height: 20),
-                    AnimatedButton(
-                      text: 'Send Reset Link',
-                      onPressed: _resetPassword,
-                      backgroundColor: AppColors.secondaryButtonColor,
-                      textColor: AppColors.secondaryButtonTextColor,
+                    child: SafeArea(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 24.0),
+                        child: Form(
+                          key: _formKey,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            children: [
+                              const SizedBox(height: 60),
+                              Center(
+                                child: Text(
+                                  'Forgot Password',
+                                  style: AppTextStyles.headingStyleWithShadow,
+                                  textAlign: TextAlign.center,
+                                ),
+                              ),
+                              const SizedBox(height: 20),
+                              Center(
+                                child: Text(
+                                  'Enter your email to reset your password.',
+                                  style: AppTextStyles.subheadingStyle,
+                                  textAlign: TextAlign.center,
+                                ),
+                              ),
+                              const SizedBox(height: 60),
+                              CustomTextField(
+                                hintText: 'Email',
+                                onChanged: (value) => _email = value,
+                                validator: (value) =>
+                                    value!.isEmpty ? 'Enter email' : null,
+                                focusNode: _emailFocusNode,
+                                onFieldSubmitted: (_) => _resetPassword(),
+                                prefixIcon: Icons.email,
+                              ),
+                              const SizedBox(height: 24),
+                              AnimatedButton(
+                                text: 'Send Reset Link',
+                                onPressed: _resetPassword,
+                                backgroundColor: AppColors.primaryButtonColor,
+                                textColor: AppColors.primaryButtonTextColor,
+                              ),
+                              const SizedBox(height: 16),
+                              Center(
+                                child: TextButton(
+                                  onPressed: () {
+                                    Navigator.pushReplacementNamed(
+                                        context, '/login');
+                                  },
+                                  child: Text(
+                                    'Back to Login',
+                                    style: AppTextStyles.bodyTextStyle.copyWith(
+                                      color: AppColors.primaryTextColor,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
                     ),
-                  ],
+                  ),
                 ),
               ),
-            ),
+      ),
     );
   }
 }

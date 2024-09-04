@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:sycx_flutter_app/screens/auth/forgot_password.dart';
 import 'package:sycx_flutter_app/screens/auth/login.dart';
 import 'package:sycx_flutter_app/screens/auth/register.dart';
+import 'package:sycx_flutter_app/screens/auth/reset_password.dart';
 import 'package:sycx_flutter_app/screens/splash.dart';
 import 'package:sycx_flutter_app/screens/welcome.dart';
 import 'package:sycx_flutter_app/screens/home.dart';
@@ -24,8 +26,10 @@ class MyApp extends StatelessWidget {
       home: const Splash(),
       routes: {
         '/welcome': (context) => const Welcome(),
-        '/login': (context) => const Login(),
         '/register': (context) => const Register(),
+        '/login': (context) => const Login(),
+        '/forgot_password': (context) => const ForgotPassword(),
+        // '/reset_password': (context) => const ResetPassword(token: token),
         '/home': (context) => const Home(),
       },
     );

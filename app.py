@@ -94,7 +94,7 @@ def reset_password():
         return jsonify({'error': 'User not found'}), 404
 
     # In a real application, this token should be sent via email
-    reset_token = str(uuid.uuid4())
+    reset_token = ""
     users_collection.update_one({'_id': user['_id']}, {'$set': {'reset_token': reset_token}})
 
     return jsonify({'message': 'Password reset token generated', 'reset_token': reset_token})
