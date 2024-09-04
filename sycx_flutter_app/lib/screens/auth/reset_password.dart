@@ -23,7 +23,7 @@ class ResetPasswordState extends State<ResetPassword> {
   String _confirmPassword = '';
   bool _obscureNewPassword = true;
   bool _obscureConfirmPassword = true;
-  bool _isLoading = false; // Add this line
+  bool _isLoading = false;
 
   void _resetPassword() async {
     if (_formKey.currentState!.validate()) {
@@ -36,10 +36,10 @@ class ResetPasswordState extends State<ResetPassword> {
         return;
       }
 
-      setState(() => _isLoading = true); // Add this line
+      setState(() => _isLoading = true);
       bool success =
           await Auth.confirmResetPassword(widget.token, _newPassword);
-      setState(() => _isLoading = false); // Add this line
+      setState(() => _isLoading = false);
       if (success) {
         Fluttertoast.showToast(
           msg: "Password reset successfully",
@@ -83,8 +83,8 @@ class ResetPasswordState extends State<ResetPassword> {
         }
       },
       child: Scaffold(
-        body: _isLoading // Add this line
-            ? const Loading() // Add this line
+        body: _isLoading
+            ? const Loading()
             : RefreshIndicator(
                 onRefresh: _handleRefresh,
                 child: SingleChildScrollView(

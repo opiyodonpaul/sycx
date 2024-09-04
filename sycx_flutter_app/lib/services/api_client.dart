@@ -111,6 +111,7 @@ class ApiClient {
   Future<Map<String, String>> _getHeaders(bool authRequired) async {
     Map<String, String> headers = {
       'Accept': 'application/json',
+      'Content-Type': 'application/json',
     };
 
     if (authRequired) {

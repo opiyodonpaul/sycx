@@ -6,6 +6,10 @@ from summarizer import summarize_document, save_feedback, retrieve_summary, down
 from model import get_model
 from werkzeug.security import generate_password_hash, check_password_hash
 from io import BytesIO
+import uuid
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 
 # Load environment variables
 load_dotenv()
@@ -23,6 +27,114 @@ summaries_collection = db['summaries']
 # Get the summarization model
 summarization_model = get_model()
 
+# Email configuration
+SMTP_SERVER = "smtp.gmail.com"
+SMTP_PORT = 587
+SMTP_USERNAME = os.getenv('SMTP_USERNAME')
+SMTP_PASSWORD = os.getenv('SMTP_PASSWORD')
+SENDER_EMAIL = os.getenv('SENDER_EMAIL')
+
+def send_reset_email(email, reset_token):
+    msg = MIMEMultipart()
+    msg['From'] = SENDER_EMAIL
+    msg['To'] = email
+    msg['Subject'] = "Password Reset Request"
+
+    # Link to reset the password
+    reset_url = f"sycx://reset-password?token={reset_token}"
+
+    # HTML email body with inline CSS
+    body = f"""
+    <html>
+    <head>
+        <style>
+            body {{
+                margin: 0;
+                padding: 0;
+                font-family: 'Exo 2', sans-serif;
+                background: linear-gradient(to right, #6A11CB, #BC4E9C, #F56565);
+                color: #FFFFFF;
+            }}
+            .email-container {{
+                display: flex;
+                flex-direction: column;
+                justify-content: center;
+                align-items: center;
+                min-height: 100vh;
+                padding: 20px;
+            }}
+            .content {{
+                background-color: rgba(0, 0, 0, 0.7);
+                border-radius: 10px;
+                padding: 40px;
+                max-width: 600px;
+                text-align: center;
+            }}
+            .header {{
+                font-size: 32px;
+                font-weight: bold;
+                color: #FFFFFF;
+                text-shadow: 2px 2px 5px rgba(0, 0, 0, 0.3);
+                margin-bottom: 20px;
+            }}
+            .logo {{
+                margin-bottom: 20px;
+            }}
+            .button {{
+                display: inline-block;
+                padding: 15px 25px;
+                font-size: 18px;
+                color: #FFFFFF;
+                background-color: #3498DB;
+                text-decoration: none;
+                border-radius: 5px;
+                margin-top: 20px;
+            }}
+            .button:hover {{
+                background-color: #2C3E50;
+            }}
+            .footer {{
+                margin-top: 20px;
+                font-size: 12px;
+                color: #A0AEC0;
+            }}
+        </style>
+    </head>
+    <body>
+        <div class="email-container">
+            <div class="content">
+                <img src="https://opiyodon.github.io/sycx/sycx_flutter_app/assets/logo/logo.png" alt="App Logo" class="logo" width="100" />
+                <div class="header">Reset Your Password</div>
+                <p>Hi dear User,</p>
+                <p>We received a request to reset your password. Click the button below to reset it:</p>
+                <a href="{reset_url}" class="button">Reset Your Password</a>
+                <p style="margin-top: 10px; font-size: 14px;">
+                If the button doesn't work, copy and paste this link into your browser: 
+                <a href="{reset_url}" style="color: #3498DB;">{reset_url}</a>
+                </p>
+                <div class="footer">
+                    <p>If you didn't request a password reset, you can ignore this email.</p>
+                    <p>© 2024 SycX. All rights reserved.</p>
+                </div>
+            </div>
+        </div>
+    </body>
+    </html>
+    """
+
+    # Attach the HTML body to the email
+    msg.attach(MIMEText(body, 'html'))
+
+    try:
+        with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as server:
+            server.starttls()
+            server.login(SMTP_USERNAME, SMTP_PASSWORD)
+            server.send_message(msg)
+        print(f"Reset email sent successfully to {email}")
+    except Exception as e:
+        print(f"Error sending email: {e}")
+        raise
+    
 @app.route('/register', methods=['POST'])
 def register():
     try:
@@ -81,29 +193,43 @@ def login():
         print(f"Login error: {e}")
         return jsonify({'error': 'Internal server error'}), 500
 
+@app.route('/forgot_password', methods=['POST'])
+def forgot_password():
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({'error': 'No JSON data received'}), 400
+
+        email = data.get('email')
+
+        if not email:
+            return jsonify({'error': 'Missing email'}), 400
+
+        user = users_collection.find_one({'email': email})
+        if not user:
+            return jsonify({'error': 'User not found'}), 404
+
+        reset_token = str(uuid.uuid4())
+        users_collection.update_one({'_id': user['_id']}, {'$set': {'reset_token': reset_token}})
+
+        try:
+            send_reset_email(email, reset_token)
+            return jsonify({'message': 'Password reset email sent successfully'})
+        except Exception as e:
+            print(f"Error sending email: {e}")
+            return jsonify({'error': 'Failed to send reset email'}), 500
+    except Exception as e:
+        print(f"Unexpected error in forgot_password: {e}")
+        return jsonify({'error': 'Internal server error'}), 500
+
 @app.route('/reset_password', methods=['POST'])
 def reset_password():
     data = request.json
-    email = data.get('email')
-
-    if not email:
-        return jsonify({'error': 'Missing email'}), 400
-
-    user = users_collection.find_one({'email': email})
-    if not user:
-        return jsonify({'error': 'User not found'}), 404
-
-    # In a real application, this token should be sent via email
-    reset_token = ""
-    users_collection.update_one({'_id': user['_id']}, {'$set': {'reset_token': reset_token}})
-
-    return jsonify({'message': 'Password reset token generated', 'reset_token': reset_token})
-
-@app.route('/confirm_reset_password', methods=['POST'])
-def confirm_reset_password():
-    data = request.json
     reset_token = data.get('token')
     new_password = data.get('new_password')
+
+    if not reset_token or not new_password:
+        return jsonify({'error': 'Missing token or new password'}), 400
 
     user = users_collection.find_one({'reset_token': reset_token})
     if not user:

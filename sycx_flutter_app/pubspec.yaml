@@ -47,6 +47,7 @@ dependencies:
   fluttertoast: ^8.2.8
   google_fonts: ^6.2.1
   flutter_spinkit: ^5.2.1
+  uni_links2: ^0.6.0+2
 
 dev_dependencies:
   flutter_test:

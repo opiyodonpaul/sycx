@@ -17,13 +17,13 @@ class ForgotPasswordState extends State<ForgotPassword> {
   final _formKey = GlobalKey<FormState>();
   final _emailFocusNode = FocusNode();
   String _email = '';
-  bool _isLoading = false; // Add this line
+  bool _isLoading = false;
 
   void _resetPassword() async {
     if (_formKey.currentState!.validate()) {
-      setState(() => _isLoading = true); // Add this line
+      setState(() => _isLoading = true);
       bool success = await Auth.resetPassword(_email);
-      setState(() => _isLoading = false); // Add this line
+      setState(() => _isLoading = false);
       if (success) {
         Fluttertoast.showToast(
           msg: "Password reset link sent to your email",
@@ -65,8 +65,8 @@ class ForgotPasswordState extends State<ForgotPassword> {
         }
       },
       child: Scaffold(
-        body: _isLoading // Add this line
-            ? const Loading() // Add this line
+        body: _isLoading
+            ? const Loading()
             : RefreshIndicator(
                 onRefresh: _handleRefresh,
                 child: SingleChildScrollView(
