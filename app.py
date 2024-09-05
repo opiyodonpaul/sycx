@@ -40,8 +40,8 @@ def send_reset_email(email, reset_token):
     msg['To'] = email
     msg['Subject'] = "Password Reset Request"
 
-    # Link to the web page that will open the app
-    reset_url = f"https://yourdomain.com/reset-password.html?token={reset_token}"
+    # Link to the web page where users will reset the password
+    reset_url = f"https://sycx.vercel.app?token={reset_token}"
 
     # HTML email body with inline CSS
     body = f"""
