@@ -40,11 +40,17 @@
         min-height: 100vh;
       }
 
+      .container {
+        width: 100%;
+        max-width: 400px;
+        padding: 20px;
+        box-sizing: border-box;
+      }
+
       .card {
         background-color: rgba(0, 0, 0, 0.7);
         border-radius: 10px;
         padding: 40px;
-        max-width: 400px;
         width: 100%;
         box-sizing: border-box;
         text-align: center;
@@ -52,10 +58,12 @@
 
       .logo {
         margin-bottom: 20px;
+        max-width: 100px;
+        height: auto;
       }
 
       .header {
-        font-size: 32px;
+        font-size: 28px;
         font-weight: bold;
         color: var(--primary-text);
         text-shadow: 2px 2px 5px rgba(0, 0, 0, 0.3);
@@ -63,7 +71,7 @@
       }
 
       .subheader {
-        font-size: 18px;
+        font-size: 16px;
         font-weight: 500;
         color: var(--alt-primary-text);
         margin-bottom: 30px;
@@ -97,6 +105,7 @@
 
       .button {
         display: inline-block;
+        width: 100%;
         padding: 15px 25px;
         font-size: 18px;
         font-weight: 600;
@@ -136,45 +145,69 @@
         opacity: 0;
         transition: opacity 0.3s;
       }
+
+      @media (max-width: 480px) {
+        .container {
+          padding: 15px;
+        }
+
+        .card {
+          padding: 20px;
+        }
+
+        .header {
+          font-size: 24px;
+        }
+
+        .subheader {
+          font-size: 14px;
+        }
+
+        .button {
+          font-size: 16px;
+          padding: 12px 20px;
+        }
+      }
     </style>
     <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
   </head>
   <body>
-    <div class="card">
-      <img
-        src="https://opiyodon.github.io/sycx/sycx_flutter_app/assets/logo/logo.png"
-        alt="App Logo"
-        class="logo"
-        width="100"
-      />
-      <div class="header">Reset Your Password</div>
-      <div class="subheader">Enter your new password</div>
-      <div class="input-container">
-        <input type="password" id="new-password" placeholder="New Password" />
-        <span
-          id="toggle-new-password"
-          class="toggle-password"
-          onclick="togglePasswordVisibility('new-password')"
-          >🙈</span
-        >
-      </div>
-      <div class="input-container">
-        <input
-          type="password"
-          id="confirm-password"
-          placeholder="Confirm Password"
+    <div class="container">
+      <div class="card">
+        <img
+          src="https://opiyodon.github.io/sycx/sycx_flutter_app/assets/logo/logo.png"
+          alt="App Logo"
+          class="logo"
         />
-        <span
-          id="toggle-confirm-password"
-          class="toggle-password"
-          onclick="togglePasswordVisibility('confirm-password')"
-          >🙈</span
-        >
-      </div>
-      <button class="button" onclick="resetPassword()">Reset Password</button>
-      <div class="footer">
-        If you didn't request a password reset, you can ignore this page.
-        <p>© 2024 SycX. All rights reserved.</p>
+        <div class="header">Reset Your Password</div>
+        <div class="subheader">Enter your new password</div>
+        <div class="input-container">
+          <input type="password" id="new-password" placeholder="New Password" />
+          <span
+            id="toggle-new-password"
+            class="toggle-password"
+            onclick="togglePasswordVisibility('new-password')"
+            >🙈</span
+          >
+        </div>
+        <div class="input-container">
+          <input
+            type="password"
+            id="confirm-password"
+            placeholder="Confirm Password"
+          />
+          <span
+            id="toggle-confirm-password"
+            class="toggle-password"
+            onclick="togglePasswordVisibility('confirm-password')"
+            >🙈</span
+          >
+        </div>
+        <button class="button" onclick="resetPassword()">Reset Password</button>
+        <div class="footer">
+          If you didn't request a password reset, you can ignore this page.
+          <p>© 2024 SycX. All rights reserved.</p>
+        </div>
       </div>
     </div>
     <div id="toast-container"></div>
