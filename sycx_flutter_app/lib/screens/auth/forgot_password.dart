@@ -30,7 +30,7 @@ class ForgotPasswordState extends State<ForgotPassword> {
           toastLength: Toast.LENGTH_SHORT,
           gravity: ToastGravity.BOTTOM,
         );
-        Navigator.pop(context);
+        Navigator.pushReplacementNamed(context, '/login');
       } else {
         Fluttertoast.showToast(
           msg: "Failed to send password reset link",
