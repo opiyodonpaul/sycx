@@ -16,7 +16,7 @@ from flask_cors import CORS
 load_dotenv()
 
 app = Flask(__name__)
-CORS(app, resources={r"/*": {"origins": "*"}})
+CORS(app, resources={r"/*": {"origins": "https://sycx.vercel.app"}}, supports_credentials=True)
 app.secret_key = os.getenv('FLASK_SECRET_KEY')
 
 # MongoDB configuration
