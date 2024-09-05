@@ -136,16 +136,6 @@
         opacity: 0;
         transition: opacity 0.3s;
       }
-
-      .toast-progress {
-        width: 100%;
-        height: 3px;
-        background-color: var(--primary-button);
-        position: absolute;
-        bottom: 0;
-        left: 0;
-        transition: width 3s linear;
-      }
     </style>
   </head>
   <body>
@@ -273,7 +263,6 @@
         toast.className = "toast";
         toast.innerHTML = `
                 ${message}
-                <div class="toast-progress"></div>
             `;
 
         document.getElementById("toast-container").appendChild(toast);
