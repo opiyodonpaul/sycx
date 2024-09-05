@@ -137,6 +137,7 @@
         transition: opacity 0.3s;
       }
     </style>
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
   </head>
   <body>
     <div class="card">
@@ -229,31 +230,26 @@
           return;
         }
 
-        fetch("http://127.0.0.1:5000/reset_password", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
+        axios
+          .post("http://127.0.0.1:5000/reset_password", {
             token: token,
             new_password: newPassword,
-          }),
-        })
-          .then((response) => response.json())
-          .then((data) => {
-            if (data.success) {
+          })
+          .then((response) => {
+            if (response.data.success) {
               showToast("Password reset successful!", "success");
               setTimeout(() => {
                 window.location.href = "https://sycx.vercel.app/success.html";
               }, 3000);
             } else {
               showToast(
-                data.error || "An error occurred. Please try again.",
+                response.data.error || "An error occurred. Please try again.",
                 "error"
               );
             }
           })
           .catch((error) => {
+            console.error("Error:", error);
             showToast("An error occurred. Please try again later.", "error");
           });
       }
