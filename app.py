@@ -11,16 +11,16 @@ import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from flask_cors import CORS
+from datetime import datetime, timedelta
 
 # Load environment variables
 load_dotenv()
 
 app = Flask(__name__)
-CORS(app, resources={r"/*": {"origins": "*"}})
+CORS(app, resources={r"/*": {"origins": "https://sycx.vercel.app"}}, supports_credentials=True)
 app.secret_key = os.getenv('FLASK_SECRET_KEY')
 
 # MongoDB configuration
-print("MONGODB_URI:", os.getenv('MONGODB_URI'))
 client = MongoClient(os.getenv('MONGODB_URI'))
 db = client['sycx']
 users_collection = db['users']
@@ -36,7 +36,10 @@ SMTP_USERNAME = os.getenv('SMTP_USERNAME')
 SMTP_PASSWORD = os.getenv('SMTP_PASSWORD')
 SENDER_EMAIL = os.getenv('SENDER_EMAIL')
 
-def send_reset_email(email, reset_token):
+# Set password reset token expiration time (in hours)
+TOKEN_EXPIRATION_HOURS = 1
+
+def send_reset_email(email, reset_token, expiration_time):
     msg = MIMEMultipart()
     msg['From'] = SENDER_EMAIL
     msg['To'] = email
@@ -45,79 +48,35 @@ def send_reset_email(email, reset_token):
     reset_url = f"https://sycx.vercel.app?token={reset_token}"
 
     body = f"""
-    <html>
+    <!DOCTYPE html>
+    <html lang="en">
     <head>
-        <style>
-            body {{
-                margin: 0;
-                padding: 0;
-                font-family: 'Exo 2', sans-serif;
-                background: linear-gradient(to right, #6A11CB, #BC4E9C, #F56565);
-                color: #FFFFFF;
-            }}
-            .email-container {{
-                display: flex;
-                flex-direction: column;
-                justify-content: center;
-                align-items: center;
-                min-height: 100vh;
-                padding: 20px;
-            }}
-            .content {{
-                background-color: rgba(0, 0, 0, 0.7);
-                border-radius: 10px;
-                padding: 40px;
-                max-width: 600px;
-                text-align: center;
-            }}
-            .header {{
-                font-size: 32px;
-                font-weight: bold;
-                color: #FFFFFF;
-                text-shadow: 2px 2px 5px rgba(0, 0, 0, 0.3);
-                margin-bottom: 20px;
-            }}
-            .logo {{
-                margin-bottom: 20px;
-            }}
-            .button {{
-                display: inline-block;
-                padding: 15px 25px;
-                font-size: 18px;
-                color: #FFFFFF;
-                background-color: #3498DB;
-                text-decoration: none;
-                border-radius: 5px;
-                margin-top: 20px;
-            }}
-            .button:hover {{
-                background-color: #2C3E50;
-            }}
-            .footer {{
-                margin-top: 20px;
-                font-size: 12px;
-                color: #A0AEC0;
-            }}
-        </style>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Reset Your Password</title>
+        <link href="https://fonts.googleapis.com/css2?family=Exo+2:wght@400;500;600;700&display=swap" rel="stylesheet">
     </head>
-    <body>
-        <div class="email-container">
-            <div class="content">
-                <img src="https://opiyodon.github.io/sycx/sycx_flutter_app/assets/logo/logo.png" alt="App Logo" class="logo" width="100" />
-                <div class="header">Reset Your Password</div>
-                <p>Hi dear User,</p>
-                <p>We received a request to reset your password. Click the button below to reset it:</p>
-                <a href="{reset_url}" class="button">Reset Your Password</a>
-                <p style="margin-top: 10px; font-size: 14px;">
-                If the button doesn't work, copy and paste this link into your browser: 
-                <a href="{reset_url}" style="color: #3498DB;">{reset_url}</a>
-                </p>
-                <div class="footer">
-                    <p>If you didn't request a password reset, you can ignore this email.</p>
-                    <p>© 2024 SycX. All rights reserved.</p>
-                </div>
-            </div>
-        </div>
+    <body style="margin: 0; padding: 0; font-family: 'Exo 2', sans-serif; background-color: #6a11cb; background-image: linear-gradient(to right, #6a11cb, #bc4e9c, #f56565);">
+        <table border="0" cellpadding="0" cellspacing="0" width="100%" style="min-width: 100%;">
+            <tr>
+                <td align="center" style="padding: 20px 15px;">
+                    <table border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 400px; background-color: rgba(0, 0, 0, 0.7); border-radius: 20px; box-shadow: 0 4px 10px rgba(0,0,0,0.3);">
+                        <tr>
+                            <td align="center" style="padding: 40px 20px;">
+                                <img src="https://opiyodon.github.io/sycx/sycx_flutter_app/assets/logo/logo.png" alt="SycX Logo" width="80" style="display: block; margin-bottom: 30px; max-width: 80px; height: auto;">
+                                <h1 style="color: #ffffff; font-size: 24px; font-weight: bold; margin: 0 0 30px 0; text-shadow: 2px 2px 5px rgba(0,0,0,0.3);">Reset Your Password</h1>
+                                <p style="color: #d0d8e0; font-size: 16px; line-height: 24px; margin: 0 0 20px 0;">Hi dear User,</p>
+                                <p style="color: #d0d8e0; font-size: 16px; line-height: 24px; margin: 0 0 30px 0;">We received a request to reset your password. Click the button below to reset it:</p>
+                                <a href="{reset_url}" style="display: inline-block; padding: 12px 24px; background-color: #3498db; color: #ffffff; font-size: 16px; font-weight: 600; text-decoration: none; border-radius: 25px; margin-bottom: 30px;">Reset Password</a>
+                                <p style="color: #a0aec0; font-size: 12px; line-height: 18px; margin: 0 0 20px 0;">For security reasons, this link will expire on {expiration_time.strftime('%Y-%m-%d %H:%M:%S')} UTC.</p>
+                                <p style="color: #a0aec0; font-size: 12px; line-height: 18px; margin: 0 0 10px 0;">If you didn't request a password reset, you can ignore this email.</p>
+                                <p style="color: #a0aec0; font-size: 12px; line-height: 18px; margin: 0;">© 2024 SycX. All rights reserved.</p>
+                            </td>
+                        </tr>
+                    </table>
+                </td>
+            </tr>
+        </table>
     </body>
     </html>
     """
@@ -168,7 +127,8 @@ def register():
             'email': email,
             'password': hashed_password,
             'profile_pic': profile_pic_base64,
-            'reset_token': None
+            'reset_token': None,
+            'reset_token_expiry': None
         })
 
         return jsonify({'message': 'User registered successfully', 'user_id': str(result.inserted_id)})
@@ -213,10 +173,19 @@ def forgot_password():
             return jsonify({'error': 'User not found'}), 404
 
         reset_token = str(uuid.uuid4())
-        users_collection.update_one({'_id': user['_id']}, {'$set': {'reset_token': reset_token}})
+        expiration_time = datetime.utcnow() + timedelta(hours=TOKEN_EXPIRATION_HOURS)
+        users_collection.update_one(
+            {'_id': user['_id']},
+            {
+                '$set': {
+                    'reset_token': reset_token,
+                    'reset_token_expiry': expiration_time
+                }
+            }
+        )
 
         try:
-            send_reset_email(email, reset_token)
+            send_reset_email(email, reset_token, expiration_time)
             return jsonify({'message': 'Password reset email sent successfully'})
         except Exception as e:
             print(f"Error sending email: {e}")
@@ -239,8 +208,20 @@ def reset_password():
         if not user:
             return jsonify({'success': False, 'error': 'Invalid or expired token'}), 400
 
+        if user['reset_token_expiry'] < datetime.utcnow():
+            return jsonify({'success': False, 'error': 'Token has expired'}), 400
+
         hashed_password = generate_password_hash(new_password)
-        users_collection.update_one({'_id': user['_id']}, {'$set': {'password': hashed_password, 'reset_token': None}})
+        users_collection.update_one(
+            {'_id': user['_id']},
+            {
+                '$set': {
+                    'password': hashed_password,
+                    'reset_token': None,
+                    'reset_token_expiry': None
+                }
+            }
+        )
 
         return jsonify({'success': True, 'message': 'Password reset successful'})
     except Exception as e:
