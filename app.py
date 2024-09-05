@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify, send_file, send_from_directory
+from flask import Flask, request, jsonify, send_file
 from pymongo import MongoClient
 from dotenv import load_dotenv
 import os
@@ -92,10 +92,6 @@ def send_reset_email(email, reset_token, expiration_time):
     except Exception as e:
         print(f"Error sending email: {e}")
         raise
-
-@app.route('/favicon.ico')
-def favicon():
-    return send_from_directory(directory='.', path='favicon.ico')
 
 @app.route('/register', methods=['POST'])
 def register():
