@@ -62,40 +62,9 @@ class Welcome extends StatelessWidget {
                       SizedBox(
                         height: 300,
                         width: double.infinity,
-                        child: Image.network(
-                          'https://images.unsplash.com/photo-1517971071642-34a2d3ecc9cd?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1288&q=80',
+                        child: Image.asset(
+                          'assets/images/welcome.png',
                           fit: BoxFit.cover,
-                          loadingBuilder: (BuildContext context, Widget child,
-                              ImageChunkEvent? loadingProgress) {
-                            if (loadingProgress == null) return child;
-                            return Container(
-                              height: 300,
-                              width: double.infinity,
-                              decoration: const BoxDecoration(
-                                gradient: LinearGradient(
-                                  begin: Alignment.topLeft,
-                                  end: Alignment.bottomRight,
-                                  colors: [
-                                    AppColors.gradientStart,
-                                    AppColors.gradientMiddle,
-                                    AppColors.gradientEnd,
-                                  ],
-                                ),
-                              ),
-                              child: Center(
-                                child: CircularProgressIndicator(
-                                  value: loadingProgress.expectedTotalBytes !=
-                                          null
-                                      ? loadingProgress.cumulativeBytesLoaded /
-                                          loadingProgress.expectedTotalBytes!
-                                      : null,
-                                  valueColor:
-                                      const AlwaysStoppedAnimation<Color>(
-                                          AppColors.primaryButtonColor),
-                                ),
-                              ),
-                            );
-                          },
                         ),
                       ),
                       Container(
