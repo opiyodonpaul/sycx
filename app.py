@@ -10,11 +10,13 @@ import uuid
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+from flask_cors import CORS
 
 # Load environment variables
 load_dotenv()
 
 app = Flask(__name__)
+CORS(app)
 app.secret_key = os.getenv('FLASK_SECRET_KEY')
 
 # MongoDB configuration
@@ -40,10 +42,8 @@ def send_reset_email(email, reset_token):
     msg['To'] = email
     msg['Subject'] = "Password Reset Request"
 
-    # Link to the web page where users will reset the password
     reset_url = f"https://sycx.vercel.app?token={reset_token}"
 
-    # HTML email body with inline CSS
     body = f"""
     <html>
     <head>
@@ -122,7 +122,6 @@ def send_reset_email(email, reset_token):
     </html>
     """
 
-    # Attach the HTML body to the email
     msg.attach(MIMEText(body, 'html'))
 
     try:
@@ -134,7 +133,7 @@ def send_reset_email(email, reset_token):
     except Exception as e:
         print(f"Error sending email: {e}")
         raise
-    
+
 @app.route('/favicon.ico')
 def favicon():
     return send_from_directory(directory='.', path='favicon.ico')
@@ -153,7 +152,6 @@ def register():
         if not email or not username or not password or not profile_pic_base64:
             return jsonify({'error': 'Missing required fields'}), 400
 
-        # Try to find the user in the database
         try:
             user = users_collection.find_one({'email': email})
         except Exception as e:
@@ -169,7 +167,8 @@ def register():
             'username': username,
             'email': email,
             'password': hashed_password,
-            'profile_pic': profile_pic_base64
+            'profile_pic': profile_pic_base64,
+            'reset_token': None
         })
 
         return jsonify({'message': 'User registered successfully', 'user_id': str(result.inserted_id)})
@@ -242,7 +241,7 @@ def reset_password():
     hashed_password = generate_password_hash(new_password)
     users_collection.update_one({'_id': user['_id']}, {'$set': {'password': hashed_password, 'reset_token': None}})
 
-    return jsonify({'message': 'Password reset successful'})
+    return jsonify({'success': True, 'message': 'Password reset successful'})
 
 @app.route('/update_profile', methods=['PUT'])
 def update_profile():
