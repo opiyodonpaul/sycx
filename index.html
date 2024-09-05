@@ -231,10 +231,19 @@
         }
 
         axios
-          .post("http://127.0.0.1:5000/reset_password", {
-            token: token,
-            new_password: newPassword,
-          })
+          .post(
+            "http://127.0.0.1:5000/reset_password",
+            {
+              token: token,
+              new_password: newPassword,
+            },
+            {
+              headers: {
+                "Content-Type": "application/json",
+                "Access-Control-Allow-Origin": "*",
+              },
+            }
+          )
           .then((response) => {
             if (response.data.success) {
               showToast("Password reset successful!", "success");
@@ -250,7 +259,24 @@
           })
           .catch((error) => {
             console.error("Error:", error);
-            showToast("An error occurred. Please try again later.", "error");
+            if (error.response) {
+              showToast(
+                `Error: ${
+                  error.response.data.error || "An unexpected error occurred"
+                }`,
+                "error"
+              );
+            } else if (error.request) {
+              showToast(
+                "Network error. Please check your connection and try again.",
+                "error"
+              );
+            } else {
+              showToast(
+                "An unexpected error occurred. Please try again later.",
+                "error"
+              );
+            }
           });
       }
 
