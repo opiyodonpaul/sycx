@@ -21,7 +21,6 @@ CORS(app, resources={r"/*": {"origins": "https://sycx.vercel.app"}}, supports_cr
 app.secret_key = os.getenv('FLASK_SECRET_KEY')
 
 # MongoDB configuration
-print("MONGODB_URI:", os.getenv('MONGODB_URI'))
 client = MongoClient(os.getenv('MONGODB_URI'))
 db = client['sycx']
 users_collection = db['users']
@@ -54,122 +53,30 @@ def send_reset_email(email, reset_token, expiration_time):
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>SycX - Reset Password</title>
+        <title>Reset Your Password</title>
         <link href="https://fonts.googleapis.com/css2?family=Exo+2:wght@400;500;600;700&display=swap" rel="stylesheet">
-        <style>
-            :root {{
-                --gradient-start: #6a11cb;
-                --gradient-middle: #bc4e9c;
-                --gradient-end: #f56565;
-                --primary-button: #3498db;
-                --secondary-button: #2c3e50;
-                --text-field-border: #4a5568;
-                --text-field-fill: #2d3748;
-                --primary-text: #ffffff;
-                --secondary-text: #a0aec0;
-                --alt-primary-text: #d0d8e0;
-            }}
-
-            body {{
-                margin: 0;
-                padding: 0;
-                font-family: "Exo 2", sans-serif;
-                background: linear-gradient(
-                    to right,
-                    var(--gradient-start),
-                    var(--gradient-middle),
-                    var(--gradient-end)
-                );
-                color: var(--primary-text);
-                display: flex;
-                justify-content: center;
-                align-items: center;
-                min-height: 100vh;
-            }}
-
-            .email-container {{
-                background-color: rgba(0, 0, 0, 0.7);
-                border-radius: 10px;
-                padding: 40px;
-                max-width: 600px;
-                width: 100%;
-                box-sizing: border-box;
-                text-align: center;
-            }}
-
-            .logo {{
-                margin-bottom: 20px;
-            }}
-
-            .header {{
-                font-size: 32px;
-                font-weight: bold;
-                color: var(--primary-text);
-                text-shadow: 2px 2px 5px rgba(0, 0, 0, 0.3);
-                margin-bottom: 20px;
-            }}
-
-            .subheader {{
-                font-size: 18px;
-                font-weight: 500;
-                color: var(--alt-primary-text);
-                margin-bottom: 30px;
-            }}
-
-            .button {{
-                display: inline-block;
-                padding: 15px 25px;
-                font-size: 18px;
-                font-weight: 600;
-                color: var(--primary-text);
-                background-color: var(--primary-button);
-                text-decoration: none;
-                border-radius: 30px;
-                margin-top: 20px;
-                transition: background-color 0.3s;
-            }}
-
-            .button:hover {{
-                background-color: var(--secondary-button);
-            }}
-
-            .footer {{
-                margin-top: 20px;
-                font-size: 12px;
-                color: var(--secondary-text);
-            }}
-
-            .link {{
-                color: var(--primary-button);
-                text-decoration: none;
-            }}
-
-            .link:hover {{
-                text-decoration: underline;
-            }}
-
-            .warning {{
-                margin-top: 20px;
-                font-weight: bold;
-                color: #FFA500;
-            }}
-        </style>
     </head>
-    <body>
-        <div class="email-container">
-            <img src="https://opiyodon.github.io/sycx/sycx_flutter_app/assets/logo/logo.png" alt="App Logo" class="logo" width="100" />
-            <div class="header">Reset Your Password</div>
-            <p>Hi dear User,</p>
-            <p>We received a request to reset your password. Click the button below to reset it:</p>
-            <a href="{reset_url}" class="button">Reset Your Password</a>
-            <p class="warning">
-                For security reasons, this link will expire on {expiration_time.strftime('%Y-%m-%d %H:%M:%S')} UTC.
-            </p>
-            <div class="footer">
-                <p>If you didn't request a password reset, you can ignore this email.</p>
-                <p>© 2024 SycX. All rights reserved.</p>
-            </div>
-        </div>
+    <body style="margin: 0; padding: 0; font-family: 'Exo 2', sans-serif; background-color: #6a11cb; background-image: linear-gradient(to right, #6a11cb, #bc4e9c, #f56565);">
+        <table border="0" cellpadding="0" cellspacing="0" width="100%" style="min-width: 100%;">
+            <tr>
+                <td align="center" style="padding: 20px 15px;">
+                    <table border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 400px; background-color: rgba(0, 0, 0, 0.7); border-radius: 20px; box-shadow: 0 4px 10px rgba(0,0,0,0.3);">
+                        <tr>
+                            <td align="center" style="padding: 40px 20px;">
+                                <img src="https://opiyodon.github.io/sycx/sycx_flutter_app/assets/logo/logo.png" alt="SycX Logo" width="80" style="display: block; margin-bottom: 30px; max-width: 80px; height: auto;">
+                                <h1 style="color: #ffffff; font-size: 24px; font-weight: bold; margin: 0 0 30px 0; text-shadow: 2px 2px 5px rgba(0,0,0,0.3);">Reset Your Password</h1>
+                                <p style="color: #d0d8e0; font-size: 16px; line-height: 24px; margin: 0 0 20px 0;">Hi dear User,</p>
+                                <p style="color: #d0d8e0; font-size: 16px; line-height: 24px; margin: 0 0 30px 0;">We received a request to reset your password. Click the button below to reset it:</p>
+                                <a href="{reset_url}" style="display: inline-block; padding: 12px 24px; background-color: #3498db; color: #ffffff; font-size: 16px; font-weight: 600; text-decoration: none; border-radius: 25px; margin-bottom: 30px;">Reset Password</a>
+                                <p style="color: #a0aec0; font-size: 12px; line-height: 18px; margin: 0 0 20px 0;">For security reasons, this link will expire on {expiration_time.strftime('%Y-%m-%d %H:%M:%S')} UTC.</p>
+                                <p style="color: #a0aec0; font-size: 12px; line-height: 18px; margin: 0 0 10px 0;">If you didn't request a password reset, you can ignore this email.</p>
+                                <p style="color: #a0aec0; font-size: 12px; line-height: 18px; margin: 0;">© 2024 SycX. All rights reserved.</p>
+                            </td>
+                        </tr>
+                    </table>
+                </td>
+            </tr>
+        </table>
     </body>
     </html>
     """
