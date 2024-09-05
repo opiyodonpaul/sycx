@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify, send_file
+from flask import Flask, request, jsonify, send_file, send_from_directory
 from pymongo import MongoClient
 from dotenv import load_dotenv
 import os
@@ -40,8 +40,8 @@ def send_reset_email(email, reset_token):
     msg['To'] = email
     msg['Subject'] = "Password Reset Request"
 
-    # Link to reset the password
-    reset_url = f"sycx://reset-password?token={reset_token}"
+    # Link to the web page that will open the app
+    reset_url = f"https://yourdomain.com/reset-password.html?token={reset_token}"
 
     # HTML email body with inline CSS
     body = f"""
@@ -135,6 +135,10 @@ def send_reset_email(email, reset_token):
         print(f"Error sending email: {e}")
         raise
     
+@app.route('/favicon.ico')
+def favicon():
+    return send_from_directory(directory='.', path='favicon.ico')
+
 @app.route('/register', methods=['POST'])
 def register():
     try:

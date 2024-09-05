@@ -50,19 +50,6 @@ class Auth {
     return response.statusCode == 200;
   }
 
-  static Future<bool> confirmResetPassword(
-      String token, String newPassword) async {
-    final response = await _apiClient.post(
-      '/reset_password',
-      body: {
-        'token': token,
-        'new_password': newPassword,
-      },
-    );
-
-    return response.statusCode == 200;
-  }
-
   static Future<void> logout() async {
     await SecureStorage.deleteToken();
   }
