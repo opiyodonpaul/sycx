@@ -11,6 +11,7 @@ import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from flask_cors import CORS
+from datetime import datetime, timedelta
 
 # Load environment variables
 load_dotenv()
@@ -36,7 +37,10 @@ SMTP_USERNAME = os.getenv('SMTP_USERNAME')
 SMTP_PASSWORD = os.getenv('SMTP_PASSWORD')
 SENDER_EMAIL = os.getenv('SENDER_EMAIL')
 
-def send_reset_email(email, reset_token):
+# Set password reset token expiration time (in hours)
+TOKEN_EXPIRATION_HOURS = 1
+
+def send_reset_email(email, reset_token, expiration_time):
     msg = MIMEMultipart()
     msg['From'] = SENDER_EMAIL
     msg['To'] = email
@@ -45,77 +49,125 @@ def send_reset_email(email, reset_token):
     reset_url = f"https://sycx.vercel.app?token={reset_token}"
 
     body = f"""
-    <html>
+    <!DOCTYPE html>
+    <html lang="en">
     <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>SycX - Reset Password</title>
+        <link href="https://fonts.googleapis.com/css2?family=Exo+2:wght@400;500;600;700&display=swap" rel="stylesheet">
         <style>
+            :root {{
+                --gradient-start: #6a11cb;
+                --gradient-middle: #bc4e9c;
+                --gradient-end: #f56565;
+                --primary-button: #3498db;
+                --secondary-button: #2c3e50;
+                --text-field-border: #4a5568;
+                --text-field-fill: #2d3748;
+                --primary-text: #ffffff;
+                --secondary-text: #a0aec0;
+                --alt-primary-text: #d0d8e0;
+            }}
+
             body {{
                 margin: 0;
                 padding: 0;
-                font-family: 'Exo 2', sans-serif;
-                background: linear-gradient(to right, #6A11CB, #BC4E9C, #F56565);
-                color: #FFFFFF;
-            }}
-            .email-container {{
+                font-family: "Exo 2", sans-serif;
+                background: linear-gradient(
+                    to right,
+                    var(--gradient-start),
+                    var(--gradient-middle),
+                    var(--gradient-end)
+                );
+                color: var(--primary-text);
                 display: flex;
-                flex-direction: column;
                 justify-content: center;
                 align-items: center;
                 min-height: 100vh;
-                padding: 20px;
             }}
-            .content {{
+
+            .email-container {{
                 background-color: rgba(0, 0, 0, 0.7);
                 border-radius: 10px;
                 padding: 40px;
                 max-width: 600px;
+                width: 100%;
+                box-sizing: border-box;
                 text-align: center;
             }}
-            .header {{
-                font-size: 32px;
-                font-weight: bold;
-                color: #FFFFFF;
-                text-shadow: 2px 2px 5px rgba(0, 0, 0, 0.3);
-                margin-bottom: 20px;
-            }}
+
             .logo {{
                 margin-bottom: 20px;
             }}
+
+            .header {{
+                font-size: 32px;
+                font-weight: bold;
+                color: var(--primary-text);
+                text-shadow: 2px 2px 5px rgba(0, 0, 0, 0.3);
+                margin-bottom: 20px;
+            }}
+
+            .subheader {{
+                font-size: 18px;
+                font-weight: 500;
+                color: var(--alt-primary-text);
+                margin-bottom: 30px;
+            }}
+
             .button {{
                 display: inline-block;
                 padding: 15px 25px;
                 font-size: 18px;
-                color: #FFFFFF;
-                background-color: #3498DB;
+                font-weight: 600;
+                color: var(--primary-text);
+                background-color: var(--primary-button);
                 text-decoration: none;
-                border-radius: 5px;
+                border-radius: 30px;
                 margin-top: 20px;
+                transition: background-color 0.3s;
             }}
+
             .button:hover {{
-                background-color: #2C3E50;
+                background-color: var(--secondary-button);
             }}
+
             .footer {{
                 margin-top: 20px;
                 font-size: 12px;
-                color: #A0AEC0;
+                color: var(--secondary-text);
+            }}
+
+            .link {{
+                color: var(--primary-button);
+                text-decoration: none;
+            }}
+
+            .link:hover {{
+                text-decoration: underline;
+            }}
+
+            .warning {{
+                margin-top: 20px;
+                font-weight: bold;
+                color: #FFA500;
             }}
         </style>
     </head>
     <body>
         <div class="email-container">
-            <div class="content">
-                <img src="https://opiyodon.github.io/sycx/sycx_flutter_app/assets/logo/logo.png" alt="App Logo" class="logo" width="100" />
-                <div class="header">Reset Your Password</div>
-                <p>Hi dear User,</p>
-                <p>We received a request to reset your password. Click the button below to reset it:</p>
-                <a href="{reset_url}" class="button">Reset Your Password</a>
-                <p style="margin-top: 10px; font-size: 14px;">
-                If the button doesn't work, copy and paste this link into your browser: 
-                <a href="{reset_url}" style="color: #3498DB;">{reset_url}</a>
-                </p>
-                <div class="footer">
-                    <p>If you didn't request a password reset, you can ignore this email.</p>
-                    <p>© 2024 SycX. All rights reserved.</p>
-                </div>
+            <img src="https://opiyodon.github.io/sycx/sycx_flutter_app/assets/logo/logo.png" alt="App Logo" class="logo" width="100" />
+            <div class="header">Reset Your Password</div>
+            <p>Hi dear User,</p>
+            <p>We received a request to reset your password. Click the button below to reset it:</p>
+            <a href="{reset_url}" class="button">Reset Your Password</a>
+            <p class="warning">
+                For security reasons, this link will expire on {expiration_time.strftime('%Y-%m-%d %H:%M:%S')} UTC.
+            </p>
+            <div class="footer">
+                <p>If you didn't request a password reset, you can ignore this email.</p>
+                <p>© 2024 SycX. All rights reserved.</p>
             </div>
         </div>
     </body>
@@ -168,7 +220,8 @@ def register():
             'email': email,
             'password': hashed_password,
             'profile_pic': profile_pic_base64,
-            'reset_token': None
+            'reset_token': None,
+            'reset_token_expiry': None
         })
 
         return jsonify({'message': 'User registered successfully', 'user_id': str(result.inserted_id)})
@@ -213,10 +266,19 @@ def forgot_password():
             return jsonify({'error': 'User not found'}), 404
 
         reset_token = str(uuid.uuid4())
-        users_collection.update_one({'_id': user['_id']}, {'$set': {'reset_token': reset_token}})
+        expiration_time = datetime.utcnow() + timedelta(hours=TOKEN_EXPIRATION_HOURS)
+        users_collection.update_one(
+            {'_id': user['_id']},
+            {
+                '$set': {
+                    'reset_token': reset_token,
+                    'reset_token_expiry': expiration_time
+                }
+            }
+        )
 
         try:
-            send_reset_email(email, reset_token)
+            send_reset_email(email, reset_token, expiration_time)
             return jsonify({'message': 'Password reset email sent successfully'})
         except Exception as e:
             print(f"Error sending email: {e}")
@@ -239,8 +301,20 @@ def reset_password():
         if not user:
             return jsonify({'success': False, 'error': 'Invalid or expired token'}), 400
 
+        if user['reset_token_expiry'] < datetime.utcnow():
+            return jsonify({'success': False, 'error': 'Token has expired'}), 400
+
         hashed_password = generate_password_hash(new_password)
-        users_collection.update_one({'_id': user['_id']}, {'$set': {'password': hashed_password, 'reset_token': None}})
+        users_collection.update_one(
+            {'_id': user['_id']},
+            {
+                '$set': {
+                    'password': hashed_password,
+                    'reset_token': None,
+                    'reset_token_expiry': None
+                }
+            }
+        )
 
         return jsonify({'success': True, 'message': 'Password reset successful'})
     except Exception as e:
