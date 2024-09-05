@@ -16,7 +16,7 @@ from flask_cors import CORS
 load_dotenv()
 
 app = Flask(__name__)
-CORS(app)
+CORS(app, resources={r"/*": {"origins": "*"}})
 app.secret_key = os.getenv('FLASK_SECRET_KEY')
 
 # MongoDB configuration
@@ -227,21 +227,25 @@ def forgot_password():
 
 @app.route('/reset_password', methods=['POST'])
 def reset_password():
-    data = request.json
-    reset_token = data.get('token')
-    new_password = data.get('new_password')
+    try:
+        data = request.json
+        reset_token = data.get('token')
+        new_password = data.get('new_password')
 
-    if not reset_token or not new_password:
-        return jsonify({'error': 'Missing token or new password'}), 400
+        if not reset_token or not new_password:
+            return jsonify({'success': False, 'error': 'Missing token or new password'}), 400
 
-    user = users_collection.find_one({'reset_token': reset_token})
-    if not user:
-        return jsonify({'error': 'Invalid or expired token'}), 400
+        user = users_collection.find_one({'reset_token': reset_token})
+        if not user:
+            return jsonify({'success': False, 'error': 'Invalid or expired token'}), 400
 
-    hashed_password = generate_password_hash(new_password)
-    users_collection.update_one({'_id': user['_id']}, {'$set': {'password': hashed_password, 'reset_token': None}})
+        hashed_password = generate_password_hash(new_password)
+        users_collection.update_one({'_id': user['_id']}, {'$set': {'password': hashed_password, 'reset_token': None}})
 
-    return jsonify({'success': True, 'message': 'Password reset successful'})
+        return jsonify({'success': True, 'message': 'Password reset successful'})
+    except Exception as e:
+        print(f"Error in reset_password: {str(e)}")
+        return jsonify({'success': False, 'error': 'An unexpected error occurred'}), 500
 
 @app.route('/update_profile', methods=['PUT'])
 def update_profile():
