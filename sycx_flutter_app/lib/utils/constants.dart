@@ -17,8 +17,11 @@ class AppColors {
   static const Color textFieldFillColor = Color(0xFF2D3748);
 
   static const Color primaryTextColor = Colors.white;
+  static const Color primaryTextColorDark = Colors.black;
   static const Color secondaryTextColor = Color(0xFFA0AEC0);
+  static const Color secondaryTextColorDark = Color(0xFF4A5568);
   static const Color altPriTextColor = Color(0xFFD0D8E0);
+  static const Color altPriTextColorDark = Color(0xFF718096);
 }
 
 class AppTextStyles {
@@ -45,6 +48,12 @@ class AppTextStyles {
     fontSize: 18,
     fontWeight: FontWeight.w500,
     color: AppColors.altPriTextColor,
+  );
+
+  static final TextStyle titleStyle = GoogleFonts.exo2(
+    fontSize: 21,
+    fontWeight: FontWeight.w700,
+    color: AppColors.primaryTextColorDark,
   );
 
   static final TextStyle buttonTextStyle = GoogleFonts.exo2(

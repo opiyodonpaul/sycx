@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:intl/intl.dart';
-import 'package:animations/animations.dart';
 import 'package:sycx_flutter_app/dummy_data.dart';
 import 'package:sycx_flutter_app/utils/constants.dart';
 import 'package:sycx_flutter_app/widgets/custom_app_bar.dart';
 import 'package:sycx_flutter_app/widgets/custom_bottom_nav_bar.dart';
+import 'package:sycx_flutter_app/widgets/custom_textfield.dart';
+import 'package:sycx_flutter_app/widgets/summary_card.dart';
 import 'search_results.dart';
 
 // Dummy data (replace with actual data from MongoDB later)
@@ -67,7 +67,6 @@ class Home extends StatefulWidget {
 }
 
 class HomeState extends State<Home> with SingleTickerProviderStateMixin {
-  final TextEditingController _searchController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   bool _showAppBarBackground = false;
   late AnimationController _animationController;
@@ -219,130 +218,112 @@ class HomeState extends State<Home> with SingleTickerProviderStateMixin {
   }
 
   Widget _buildSearchBar() {
-    return Padding(
-      padding: const EdgeInsets.all(24),
-      child: TextField(
-        controller: _searchController,
-        decoration: InputDecoration(
-          hintText: 'Search for summaries...',
-          prefixIcon: const Icon(Icons.search),
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(30),
+    return AnimatedBuilder(
+      animation: _animationController,
+      builder: (context, child) {
+        return Transform.translate(
+          offset: Tween<Offset>(
+            begin: const Offset(0, 50),
+            end: Offset.zero,
+          )
+              .animate(CurvedAnimation(
+                  parent: _animationController,
+                  curve: const Interval(0.2, 1.0, curve: Curves.easeOut)))
+              .value,
+          child: Opacity(
+            opacity: Tween<double>(begin: 0.0, end: 1.0)
+                .animate(CurvedAnimation(
+                    parent: _animationController,
+                    curve: const Interval(0.2, 1.0, curve: Curves.easeOut)))
+                .value,
+            child: child,
           ),
+        );
+      },
+      child: Padding(
+        padding: const EdgeInsets.only(
+          top: 24,
+          bottom: 8,
+          left: 24,
+          right: 24,
         ),
-        onSubmitted: (value) {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => SearchResults(searchQuery: value),
-            ),
-          );
-        },
+        child: CustomTextField(
+          hintText: 'Search for summaries...',
+          onChanged: (value) {},
+          validator: (value) => null,
+          prefixIcon: Icons.search,
+          onFieldSubmitted: (value) {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => SearchResults(searchQuery: value),
+              ),
+            );
+          },
+        ),
       ),
     );
   }
 
   Widget _buildRecentSummaries() {
-    return Padding(
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('Recent Summaries',
-              style:
-                  GoogleFonts.exo2(fontSize: 20, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 16),
-          GridView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 2,
-              crossAxisSpacing: 16,
-              mainAxisSpacing: 16,
-              childAspectRatio: 0.75,
-            ),
-            itemCount: dummySummaries.length,
-            itemBuilder: (context, index) {
-              return _buildSummaryCard(dummySummaries[index]);
-            },
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSummaryCard(Map<String, dynamic> summary) {
-    return OpenContainer(
-      transitionDuration: const Duration(milliseconds: 500),
-      openBuilder: (context, _) => Scaffold(
-        appBar: AppBar(title: Text(summary['title']!)),
-        body: const Center(child: Text('Summary details go here')),
-      ),
-      closedBuilder: (context, openContainer) => GestureDetector(
-        onTap: openContainer,
-        child: Stack(
+    return AnimatedBuilder(
+      animation: _animationController,
+      builder: (context, child) {
+        return Transform.translate(
+            offset: Tween<Offset>(
+              begin: const Offset(0, 50),
+              end: Offset.zero,
+            )
+                .animate(CurvedAnimation(
+                    parent: _animationController,
+                    curve: const Interval(0.4, 1.0, curve: Curves.easeOut)))
+                .value,
+            child: Opacity(
+              opacity: Tween<double>(begin: 0.0, end: 1.0)
+                  .animate(CurvedAnimation(
+                      parent: _animationController,
+                      curve: const Interval(0.4, 1.0, curve: Curves.easeOut)))
+                  .value,
+              child: child,
+            ));
+      },
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Container(
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(16),
-                image: DecorationImage(
-                  image: NetworkImage(summary['image']!),
-                  fit: BoxFit.cover,
-                ),
-              ),
-              child: Container(
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(16),
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [Colors.transparent, Colors.black.withOpacity(0.7)],
-                  ),
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        summary['title']!,
-                        style: GoogleFonts.exo2(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Created on ${DateFormat('MMM d, yyyy').format(DateTime.parse(summary['date']!))}',
-                        style: GoogleFonts.roboto(
-                            fontSize: 12, color: Colors.white70),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              child: Text('Recent Summaries',
+                  style: AppTextStyles.titleStyle),
             ),
-            Positioned(
-              top: 8,
-              right: 8,
-              child: GestureDetector(
-                onTap: () => _togglePin(summary['id']),
-                child: AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 300),
-                  transitionBuilder:
-                      (Widget child, Animation<double> animation) {
-                    return ScaleTransition(scale: animation, child: child);
-                  },
-                  child: Icon(
-                    summary['isPinned']
-                        ? Icons.push_pin
-                        : Icons.push_pin_outlined,
-                    key: ValueKey<bool>(summary['isPinned']),
-                    color: Colors.white,
-                  ),
-                ),
+            const SizedBox(height: 16),
+            GridView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 2,
+                childAspectRatio: 0.75,
+                crossAxisSpacing: 16,
+                mainAxisSpacing: 16,
               ),
+              itemCount: summaries.length,
+              itemBuilder: (context, index) {
+                return AnimationConfiguration.staggeredGrid(
+                  position: index,
+                  duration: const Duration(milliseconds: 375),
+                  columnCount: 2,
+                  child: ScaleAnimation(
+                    child: FadeInAnimation(
+                      child: SummaryCard(
+                        summary: summaries[index],
+                        onTogglePin: _togglePin,
+                      ),
+                    ),
+                  ),
+                );
+              },
             ),
           ],
         ),
