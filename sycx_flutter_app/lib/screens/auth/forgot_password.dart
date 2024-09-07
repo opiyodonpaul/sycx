@@ -29,6 +29,8 @@ class ForgotPasswordState extends State<ForgotPassword> {
           msg: "Password reset link sent to your email",
           toastLength: Toast.LENGTH_SHORT,
           gravity: ToastGravity.BOTTOM,
+          backgroundColor: AppColors.gradientMiddle,
+          textColor: Colors.white,
         );
         Navigator.pushReplacementNamed(context, '/login');
       } else {
@@ -36,6 +38,8 @@ class ForgotPasswordState extends State<ForgotPassword> {
           msg: "Failed to send password reset link",
           toastLength: Toast.LENGTH_SHORT,
           gravity: ToastGravity.BOTTOM,
+          backgroundColor: AppColors.gradientMiddle,
+          textColor: Colors.white,
         );
       }
     }

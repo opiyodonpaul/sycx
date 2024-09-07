@@ -51,6 +51,8 @@ class RegisterState extends State<Register> {
           msg: "Please select a profile picture",
           toastLength: Toast.LENGTH_SHORT,
           gravity: ToastGravity.BOTTOM,
+          backgroundColor: AppColors.gradientMiddle,
+          textColor: Colors.white,
         );
         return;
       }
@@ -68,6 +70,8 @@ class RegisterState extends State<Register> {
           msg: "Registration failed",
           toastLength: Toast.LENGTH_SHORT,
           gravity: ToastGravity.BOTTOM,
+          backgroundColor: AppColors.gradientMiddle,
+          textColor: Colors.white,
         );
       }
     }

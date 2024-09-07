@@ -12,7 +12,7 @@ class CustomTextField extends StatelessWidget {
   final Widget? suffixIcon;
 
   const CustomTextField({
-    Key? key,
+    super.key,
     required this.hintText,
     required this.onChanged,
     this.obscureText = false,
@@ -21,7 +21,7 @@ class CustomTextField extends StatelessWidget {
     this.onFieldSubmitted,
     this.prefixIcon,
     this.suffixIcon,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -34,17 +34,17 @@ class CustomTextField extends StatelessWidget {
         filled: true,
         fillColor: AppColors.textFieldFillColor,
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(80),
           borderSide: BorderSide.none,
         ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(80),
           borderSide: BorderSide(
             color: AppColors.textFieldBorderColor.withOpacity(0.3),
           ),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(80),
           borderSide: const BorderSide(
             color: AppColors.textFieldBorderColor,
             width: 2,
