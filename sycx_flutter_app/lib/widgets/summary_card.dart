@@ -1,7 +1,10 @@
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
 import 'package:animations/animations.dart';
 import 'package:intl/intl.dart';
 import 'package:sycx_flutter_app/utils/constants.dart';
+import 'package:sycx_flutter_app/screens/summary_details.dart';
 
 class SummaryCard extends StatelessWidget {
   final Map<String, dynamic> summary;
@@ -17,10 +20,7 @@ class SummaryCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return OpenContainer(
       transitionDuration: const Duration(milliseconds: 500),
-      openBuilder: (context, _) => Scaffold(
-        appBar: AppBar(title: Text(summary['title']!)),
-        body: const Center(child: Text('Summary details go here')),
-      ),
+      openBuilder: (context, _) => SummaryDetails(summary: summary),
       closedBuilder: (context, openContainer) => GestureDetector(
         onTap: openContainer,
         child: Stack(
@@ -54,24 +54,35 @@ class SummaryCard extends StatelessWidget {
                         ),
                       ),
                     ),
-                    Padding(
-                      padding: const EdgeInsets.all(12),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.end,
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            summary['title']!,
-                            style: AppTextStyles.subheadingStyle
-                                .copyWith(color: AppColors.primaryTextColor),
+                    Positioned(
+                      bottom: 0,
+                      left: 0,
+                      right: 0,
+                      child: ClipRRect(
+                        child: BackdropFilter(
+                          filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                          child: Container(
+                            color: Colors.black.withOpacity(0.3),
+                            padding: const EdgeInsets.all(12),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.end,
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  summary['title']!,
+                                  style: AppTextStyles.subheadingStyle.copyWith(
+                                      color: AppColors.primaryTextColor),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  'Created on ${DateFormat('MMM d, yyyy').format(DateTime.parse(summary['date']!))}',
+                                  style: AppTextStyles.bodyTextStyle.copyWith(
+                                      color: AppColors.secondaryTextColor),
+                                ),
+                              ],
+                            ),
                           ),
-                          const SizedBox(height: 4),
-                          Text(
-                            'Created on ${DateFormat('MMM d, yyyy').format(DateTime.parse(summary['date']!))}',
-                            style: AppTextStyles.bodyTextStyle
-                                .copyWith(color: AppColors.secondaryTextColor),
-                          ),
-                        ],
+                        ),
                       ),
                     ),
                   ],

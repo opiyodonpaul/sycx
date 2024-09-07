@@ -6,6 +6,7 @@ import 'package:sycx_flutter_app/screens/profile.dart';
 import 'package:sycx_flutter_app/screens/splash.dart';
 import 'package:sycx_flutter_app/screens/summary_details.dart';
 import 'package:sycx_flutter_app/screens/upload.dart';
+import 'package:sycx_flutter_app/screens/view_summary.dart';
 import 'package:sycx_flutter_app/screens/welcome.dart';
 import 'package:sycx_flutter_app/screens/home.dart';
 
@@ -33,8 +34,12 @@ class MyApp extends StatelessWidget {
         '/forgot_password': (context) => const ForgotPassword(),
         '/home': (context) => const Home(),
         '/upload': (context) => const Upload(),
-        '/summary': (context) => const Home(),
-        '/summary_details': (context) => const SummaryDetails(),
+        '/view_summary': (context) => const ViewSummary(
+              summary: {},
+            ),
+        '/summary_details': (context) => const SummaryDetails(
+              summary: {},
+            ),
         '/profile': (context) => const Profile(),
       },
     );
