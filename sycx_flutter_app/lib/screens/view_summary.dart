@@ -91,7 +91,7 @@ class ViewSummary extends StatelessWidget {
         ),
       ),
       bottomNavigationBar: const CustomBottomNavBar(
-        currentRoute: 'home',
+        currentRoute: '/view_summary',
       ),
     );
   }
