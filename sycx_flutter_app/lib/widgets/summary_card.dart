@@ -105,7 +105,7 @@ class SummaryCard extends StatelessWidget {
                         ? Icons.push_pin
                         : Icons.push_pin_outlined,
                     key: ValueKey<bool>(summary['isPinned']),
-                    color: Colors.white,
+                    color: AppColors.primaryButtonColor,
                   ),
                 ),
               ),

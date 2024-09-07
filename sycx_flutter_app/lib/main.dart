@@ -33,13 +33,14 @@ class MyApp extends StatelessWidget {
         '/login': (context) => const Login(),
         '/forgot_password': (context) => const ForgotPassword(),
         '/home': (context) => const Home(),
-        '/upload': (context) => const Upload(),
         '/view_summary': (context) => const ViewSummary(
               summary: {},
             ),
         '/summary_details': (context) => const SummaryDetails(
               summary: {},
             ),
+        '/upload': (context) => const Upload(),
+        '/summaries': (context) => const Upload(),
         '/profile': (context) => const Profile(),
       },
     );
