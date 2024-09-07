@@ -43,15 +43,20 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
               children: [
                 Image.asset(
                   'assets/logo/logo.png',
-                  height: 40,
-                  width: 40,
+                  height: 30,
+                  width: 30,
                 ),
-                const SizedBox(width: 12),
-                Text(title,
-                    style: AppTextStyles.headingStyleNoShadow.copyWith(
-                        color: showBackground
-                            ? Colors.black87
-                            : AppColors.primaryTextColor)),
+                const SizedBox(width: 10),
+                Text(
+                  title,
+                  style: AppTextStyles.headingStyleNoShadow.copyWith(
+                    color: showBackground
+                        ? Colors.black87
+                        : AppColors.primaryTextColor,
+                    fontSize: 30,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
               ],
             ),
           ),
