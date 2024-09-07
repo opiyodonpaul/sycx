@@ -1,63 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:sycx_flutter_app/dummy_data.dart';
 import 'package:sycx_flutter_app/utils/constants.dart';
 import 'package:sycx_flutter_app/widgets/custom_app_bar.dart';
 import 'package:sycx_flutter_app/widgets/custom_bottom_nav_bar.dart';
 import 'package:sycx_flutter_app/widgets/custom_textfield.dart';
 import 'package:sycx_flutter_app/widgets/summary_card.dart';
+import 'package:sycx_flutter_app/widgets/recent_searches_card.dart';
 import 'search_results.dart';
-
-// Dummy data (replace with actual data from MongoDB later)
-final dummyUser = {
-  'name': 'Artkins',
-  'email': 'opiyodon@gmail.com',
-  'avatar':
-      'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=880&q=80',
-};
-
-final dummySummaries = [
-  {
-    'id': '1',
-    'title': 'Quantum Physics',
-    'image':
-        'https://images.unsplash.com/photo-1635070041078-e363dbe005cb?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1470&q=80',
-    'date': '2023-09-01',
-    'isPinned': false
-  },
-  {
-    'id': '2',
-    'title': 'Machine Learning',
-    'image':
-        'https://images.unsplash.com/photo-1555949963-ff9fe0c870eb?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1470&q=80',
-    'date': '2023-08-28',
-    'isPinned': true
-  },
-  {
-    'id': '3',
-    'title': 'World History',
-    'image':
-        'https://images.unsplash.com/photo-1447069387593-a5de0862481e?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1469&q=80',
-    'date': '2023-08-25',
-    'isPinned': false
-  },
-  {
-    'id': '4',
-    'title': 'Organic Chemistry',
-    'image':
-        'https://images.unsplash.com/photo-1532187863486-abf9dbad1b69?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1470&q=80',
-    'date': '2023-08-22',
-    'isPinned': false
-  },
-];
-
-final dummySearches = [
-  'Artificial Intelligence',
-  'Renewable Energy',
-  'Genetic Engineering',
-  'Cybersecurity',
-];
 
 class Home extends StatefulWidget {
   const Home({super.key});
@@ -115,7 +65,7 @@ class HomeState extends State<Home> with SingleTickerProviderStateMixin {
     return Scaffold(
       extendBodyBehindAppBar: true,
       appBar: CustomAppBar(
-        user: dummyUser,
+        user: DummyData.user,
         showBackground: false,
         title: 'SycX',
       ),
@@ -137,7 +87,42 @@ class HomeState extends State<Home> with SingleTickerProviderStateMixin {
         _buildWelcomeSection(),
         _buildSearchBar(),
         _buildRecentSummaries(),
-        _buildRecentSearches(),
+        AnimatedBuilder(
+          animation: _animationController,
+          builder: (context, child) {
+            return Transform.translate(
+              offset: Tween<Offset>(
+                begin: const Offset(0, 50),
+                end: Offset.zero,
+              )
+                  .animate(CurvedAnimation(
+                      parent: _animationController,
+                      curve: const Interval(0.6, 1.0, curve: Curves.easeOut)))
+                  .value,
+              child: Opacity(
+                opacity: Tween<double>(begin: 0.0, end: 1.0)
+                    .animate(CurvedAnimation(
+                        parent: _animationController,
+                        curve: const Interval(0.6, 1.0, curve: Curves.easeOut)))
+                    .value,
+                child: child,
+              ),
+            );
+          },
+          child: RecentSearchesCard(
+            searches: searches,
+            onClearAll: () {
+              setState(() {
+                searches.clear();
+              });
+            },
+            onRemoveSearch: (index) {
+              setState(() {
+                searches.removeAt(index);
+              });
+            },
+          ),
+        ),
       ],
     );
   }
@@ -294,8 +279,7 @@ class HomeState extends State<Home> with SingleTickerProviderStateMixin {
           children: [
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 24),
-              child: Text('Recent Summaries',
-                  style: AppTextStyles.titleStyle),
+              child: Text('Recent Summaries', style: AppTextStyles.titleStyle),
             ),
             const SizedBox(height: 16),
             GridView.builder(
@@ -331,93 +315,13 @@ class HomeState extends State<Home> with SingleTickerProviderStateMixin {
     );
   }
 
-  Widget _buildRecentSearches() {
-    return Padding(
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text('Recent Searches',
-                  style: GoogleFonts.exo2(
-                      fontSize: 20, fontWeight: FontWeight.bold)),
-              ElevatedButton(
-                onPressed: () {
-                  setState(() {
-                    dummySearches.clear();
-                  });
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.blue.shade800,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                ),
-                child: const Text('Clear All'),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          AnimationLimiter(
-            child: ListView.separated(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              padding: EdgeInsets.zero,
-              itemCount: dummySearches.length,
-              separatorBuilder: (context, index) => const SizedBox(height: 5),
-              itemBuilder: (context, index) {
-                return AnimationConfiguration.staggeredList(
-                  position: index,
-                  duration: const Duration(milliseconds: 375),
-                  child: SlideAnimation(
-                    verticalOffset: 50.0,
-                    child: FadeInAnimation(
-                      child: Container(
-                        margin: const EdgeInsets.all(3),
-                        child: Card(
-                          elevation: 2,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: ListTile(
-                            contentPadding:
-                                const EdgeInsets.fromLTRB(16, 4, 16, 4),
-                            leading: const Icon(Icons.history),
-                            title: Text(
-                              dummySearches[index],
-                              style: GoogleFonts.roboto(fontSize: 16),
-                            ),
-                            trailing: IconButton(
-                              icon: const Icon(Icons.close, size: 20),
-                              onPressed: () {
-                                setState(() {
-                                  dummySearches.removeAt(index);
-                                });
-                              },
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                );
-              },
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   void _togglePin(String id) {
     setState(() {
       final summaryIndex =
-          dummySummaries.indexWhere((summary) => summary['id'] == id);
+          summaries.indexWhere((summary) => summary['id'] == id);
       if (summaryIndex != -1) {
-        dummySummaries[summaryIndex]['isPinned'] =
-            !(dummySummaries[summaryIndex]['isPinned'] as bool);
+        summaries[summaryIndex]['isPinned'] =
+            !(summaries[summaryIndex]['isPinned'] as bool);
       }
     });
   }
@@ -425,5 +329,6 @@ class HomeState extends State<Home> with SingleTickerProviderStateMixin {
   Future<void> _handleRefresh() async {
     // Simulate a network request
     await Future.delayed(const Duration(seconds: 2));
+    // You can add actual data fetching logic here
   }
 }
