@@ -34,11 +34,11 @@ class CustomTextField extends StatelessWidget {
         filled: true,
         fillColor: AppColors.textFieldFillColor,
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(80),
           borderSide: BorderSide.none,
         ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(80),
           borderSide: BorderSide(
             color: AppColors.textFieldBorderColor.withOpacity(0.3),
           ),
