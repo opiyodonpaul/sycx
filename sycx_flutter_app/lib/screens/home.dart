@@ -36,7 +36,6 @@ class HomeState extends State<Home> with SingleTickerProviderStateMixin {
   }
 
   Future<void> _loadData() async {
-    // Simulate data loading
     await Future.delayed(const Duration(seconds: 2));
     if (mounted) {
       setState(() {});
@@ -161,16 +160,15 @@ class HomeState extends State<Home> with SingleTickerProviderStateMixin {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             _buildGreeting(),
-            const SizedBox(height: 24),
-            Text(
-              'Welcome to SycX, your AI-powered summarization companion for university learning!',
-              style: AppTextStyles.subheadingStyle,
-            ),
             const SizedBox(height: 16),
             Text(
+              'Welcome to SycX, your AI-powered summarization companion!',
+              style: AppTextStyles.bodyTextStyle,
+            ),
+            const SizedBox(height: 8),
+            Text(
               'SycX helps you digest complex information quickly, create concise summaries, and enhance your learning experience.',
-              style: AppTextStyles.bodyTextStyle
-                  .copyWith(color: AppColors.secondaryTextColor),
+              style: AppTextStyles.bodyTextStyle,
             ),
           ],
         ),
@@ -192,12 +190,13 @@ class HomeState extends State<Home> with SingleTickerProviderStateMixin {
 
     return Row(
       children: [
-        Text(
-          '$greeting ${DummyData.user['name']}',
-          style: AppTextStyles.headingStyleWithShadow,
+        Expanded(
+          child: Text(
+            '$greeting ${DummyData.user['name']} 👋',
+            style: AppTextStyles.headingStyleWithShadow.copyWith(fontSize: 24),
+            overflow: TextOverflow.ellipsis,
+          ),
         ),
-        const SizedBox(width: 8),
-        const Text('👋', style: TextStyle(fontSize: 28)),
       ],
     );
   }
@@ -226,11 +225,9 @@ class HomeState extends State<Home> with SingleTickerProviderStateMixin {
         );
       },
       child: Padding(
-        padding: const EdgeInsets.only(
-          top: 24,
-          bottom: 8,
-          left: 24,
-          right: 24,
+        padding: const EdgeInsets.symmetric(
+          vertical: 16,
+          horizontal: 24,
         ),
         child: CustomTextField(
           hintText: 'Search for summaries...',
@@ -273,22 +270,23 @@ class HomeState extends State<Home> with SingleTickerProviderStateMixin {
             ));
       },
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 16),
+        padding: const EdgeInsets.symmetric(vertical: 8),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 24),
-              child: Text('Recent Summaries', style: AppTextStyles.titleStyle),
+              child: Text('Recent Summaries',
+                  style: AppTextStyles.titleStyle.copyWith(fontSize: 18)),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 8),
             GridView.builder(
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
               padding: const EdgeInsets.symmetric(horizontal: 24),
               gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                 crossAxisCount: 2,
-                childAspectRatio: 0.75,
+                childAspectRatio: 0.8,
                 crossAxisSpacing: 16,
                 mainAxisSpacing: 16,
               ),
@@ -327,8 +325,6 @@ class HomeState extends State<Home> with SingleTickerProviderStateMixin {
   }
 
   Future<void> _handleRefresh() async {
-    // Simulate a network request
     await Future.delayed(const Duration(seconds: 2));
-    // You can add actual data fetching logic here
   }
 }
