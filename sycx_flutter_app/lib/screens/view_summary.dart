@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:sycx_flutter_app/utils/constants.dart';
 import 'package:sycx_flutter_app/widgets/custom_app_bar_mini.dart';
+import 'package:sycx_flutter_app/widgets/custom_bottom_nav_bar.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class ViewSummary extends StatelessWidget {
@@ -11,90 +12,85 @@ class ViewSummary extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: CustomAppBarMini(title: summary['title']),
-      body: SingleChildScrollView(
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                summary['title'],
-                style: AppTextStyles.headingStyleNoShadow.copyWith(
-                  color: AppColors.primaryTextColorDark,
+      appBar: CustomAppBarMini(title: summary['title'] ?? 'View Summary'),
+      body: RefreshIndicator(
+        onRefresh: _handleRefresh,
+        child: SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  summary['title'] ?? 'Untitled Summary',
+                  style: AppTextStyles.headingStyleNoShadow.copyWith(
+                    color: AppColors.primaryTextColorDark,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 16),
-              Text(
-                'Author: ${summary['author']}',
-                style: AppTextStyles.subheadingStyle.copyWith(
-                  color: AppColors.altPriTextColorDark,
+                const SizedBox(height: 24),
+                _buildSection(
+                  'Introduction',
+                  summary['introduction'] ?? 'No introduction available.',
                 ),
-              ),
-              const SizedBox(height: 24),
-              _buildSection(
-                'Introduction',
-                'This summary provides an overview of the key concepts and findings in the field of machine learning. It covers various aspects including algorithms, applications, and recent advancements.',
-              ),
-              _buildImage(
-                  'https://source.unsplash.com/random/800x400?machine+learning'),
-              _buildSection(
-                'Key Concepts',
-                'Machine learning is a subset of artificial intelligence that focuses on the development of algorithms and statistical models that enable computer systems to improve their performance on a specific task through experience.',
-              ),
-              _buildSubSection(
-                'Types of Machine Learning',
-                [
-                  'Supervised Learning',
-                  'Unsupervised Learning',
-                  'Reinforcement Learning',
-                ],
-              ),
-              _buildTable(),
-              _buildSection(
-                'Applications',
-                'Machine learning has a wide range of applications across various industries:',
-              ),
-              _buildList([
-                'Healthcare: Disease prediction and diagnosis',
-                'Finance: Fraud detection and risk assessment',
-                'E-commerce: Recommendation systems',
-                'Autonomous vehicles: Self-driving cars',
-                'Natural Language Processing: Language translation and sentiment analysis',
-              ]),
-              _buildImage(
-                  'https://source.unsplash.com/random/800x400?artificial+intelligence'),
-              _buildSection(
-                'Recent Advancements',
-                'The field of machine learning is rapidly evolving. Some recent advancements include:',
-              ),
-              _buildSubSection(
-                'Transformer Models',
-                [
-                  'GPT (Generative Pre-trained Transformer)',
-                  'BERT (Bidirectional Encoder Representations from Transformers)',
-                ],
-              ),
-              _buildLink(
-                'Learn more about Transformer models',
-                'https://arxiv.org/abs/1706.03762',
-              ),
-              _buildSection(
-                'Challenges and Future Directions',
-                'Despite its progress, machine learning faces several challenges:',
-              ),
-              _buildList([
-                'Ethical considerations and bias in AI',
-                'Interpretability and explainability of complex models',
-                'Data privacy and security concerns',
-                'Computational resources and energy consumption',
-              ]),
-              const SizedBox(height: 24),
-              _buildForm(),
-            ],
+                _buildImage(summary['image'] ??
+                    'https://source.unsplash.com/random/800x400?machine+learning'),
+                _buildSection(
+                  'Key Concepts',
+                  'Machine learning is a subset of artificial intelligence that focuses on the development of algorithms and statistical models that enable computer systems to improve their performance on a specific task through experience.',
+                ),
+                _buildSubSection(
+                  'Types of Machine Learning',
+                  [
+                    'Supervised Learning',
+                    'Unsupervised Learning',
+                    'Reinforcement Learning',
+                  ],
+                ),
+                _buildTable(),
+                _buildSection(
+                  'Applications',
+                  'Machine learning has a wide range of applications across various industries:',
+                ),
+                _buildList([
+                  'Healthcare: Disease prediction and diagnosis',
+                  'Finance: Fraud detection and risk assessment',
+                  'E-commerce: Recommendation systems',
+                  'Autonomous vehicles: Self-driving cars',
+                  'Natural Language Processing: Language translation and sentiment analysis',
+                ]),
+                _buildImage(
+                    'https://plus.unsplash.com/premium_photo-1683121710572-7723bd2e235d?q=80&w=1632&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D'),
+                _buildSection(
+                  'Recent Advancements',
+                  'The field of machine learning is rapidly evolving. Some recent advancements include:',
+                ),
+                _buildSubSection(
+                  'Transformer Models',
+                  [
+                    'GPT (Generative Pre-trained Transformer)',
+                    'BERT (Bidirectional Encoder Representations from Transformers)',
+                  ],
+                ),
+                _buildLink(
+                  'Learn more about Transformer models',
+                  'https://arxiv.org/abs/1706.03762',
+                ),
+                _buildSection(
+                  'Challenges and Future Directions',
+                  'Despite its progress, machine learning faces several challenges:',
+                ),
+                _buildList([
+                  'Ethical considerations and bias in AI',
+                  'Interpretability and explainability of complex models',
+                  'Data privacy and security concerns',
+                  'Computational resources and energy consumption',
+                ]),
+              ],
+            ),
           ),
         ),
       ),
+      bottomNavigationBar: const CustomBottomNavBar(),
     );
   }
 
@@ -258,55 +254,15 @@ class ViewSummary extends StatelessWidget {
   }
 
   void _launchURL(String url) async {
-    if (await canLaunchUrl(url as Uri)) {
-      await launchUrl(url as Uri);
+    final Uri uri = Uri.parse(url);
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri);
     } else {
       throw 'Could not launch $url';
     }
   }
 
-  Widget _buildForm() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Feedback Form',
-          style: AppTextStyles.titleStyle,
-        ),
-        const SizedBox(height: 16),
-        TextFormField(
-          decoration: const InputDecoration(
-            labelText: 'Your Name',
-            border: OutlineInputBorder(),
-          ),
-        ),
-        const SizedBox(height: 16),
-        TextFormField(
-          decoration: const InputDecoration(
-            labelText: 'Your Email',
-            border: OutlineInputBorder(),
-          ),
-        ),
-        const SizedBox(height: 16),
-        TextFormField(
-          maxLines: 3,
-          decoration: const InputDecoration(
-            labelText: 'Your Feedback',
-            border: OutlineInputBorder(),
-          ),
-        ),
-        const SizedBox(height: 16),
-        ElevatedButton(
-          onPressed: () {
-            // Implement feedback submission logic
-          },
-          style: ElevatedButton.styleFrom(
-            backgroundColor: AppColors.primaryButtonColor,
-            iconColor: AppColors.primaryButtonTextColor,
-          ),
-          child: const Text('Submit Feedback'),
-        ),
-      ],
-    );
+  Future<void> _handleRefresh() async {
+    await Future.delayed(const Duration(seconds: 2));
   }
 }

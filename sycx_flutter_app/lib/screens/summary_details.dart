@@ -1,10 +1,14 @@
+import 'package:animations/animations.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:fluttertoast/fluttertoast.dart';
 import 'package:sycx_flutter_app/screens/view_summary.dart';
 import 'package:sycx_flutter_app/utils/constants.dart';
 import 'package:sycx_flutter_app/widgets/animated_button.dart';
 import 'package:sycx_flutter_app/widgets/custom_app_bar_mini.dart';
+import 'package:sycx_flutter_app/widgets/custom_bottom_nav_bar.dart';
 import 'package:sycx_flutter_app/widgets/custom_textarea.dart';
+import 'package:sycx_flutter_app/widgets/loading.dart';
 
 class SummaryDetails extends StatefulWidget {
   final Map<String, dynamic> summary;
@@ -18,240 +22,261 @@ class SummaryDetails extends StatefulWidget {
 class SummaryDetailsState extends State<SummaryDetails> {
   double _rating = 0;
   final TextEditingController _reviewController = TextEditingController();
+  bool _isLoading = false;
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: CustomAppBarMini(title: widget.summary['title']!),
-      body: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Image.network(
-              widget.summary['image']!,
-              width: double.infinity,
-              height: 200,
-              fit: BoxFit.cover,
-            ),
-            Padding(
-              padding: const EdgeInsets.all(16.0),
+    return Stack(
+      children: [
+        Scaffold(
+          appBar: CustomAppBarMini(
+              title: widget.summary['title'] ?? 'Summary Details'),
+          body: RefreshIndicator(
+            onRefresh: _handleRefresh,
+            child: SingleChildScrollView(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    widget.summary['title']!,
-                    style: AppTextStyles.headingStyleNoShadow
-                        .copyWith(color: AppColors.primaryTextColorDark),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Created on ${DateFormat('MMM d, yyyy').format(DateTime.parse(widget.summary['date']!))}',
-                    style: AppTextStyles.bodyTextStyle
-                        .copyWith(color: AppColors.altPriTextColorDark),
-                  ),
-                  const SizedBox(height: 24),
-                  Text(
-                    'Actions',
-                    style: AppTextStyles.titleStyle,
-                  ),
-                  const SizedBox(height: 16),
-                  AnimatedButton(
-                    text: 'View Summary',
-                    onPressed: () => _viewSummary(context),
-                    backgroundColor: AppColors.primaryButtonColor,
-                    textColor: AppColors.primaryButtonTextColor,
-                  ),
-                  const SizedBox(height: 12),
-                  AnimatedButton(
-                    text: 'Download Summary',
-                    onPressed: () => _downloadSummary(context),
-                    backgroundColor: AppColors.primaryButtonColor,
-                    textColor: AppColors.primaryButtonTextColor,
-                  ),
-                  const SizedBox(height: 12),
-                  AnimatedButton(
-                    text: 'Delete Summary',
-                    onPressed: () => _deleteSummary(context),
-                    backgroundColor: Colors.red,
-                    textColor: AppColors.primaryButtonTextColor,
-                  ),
-                  const SizedBox(height: 24),
-                  Text(
-                    'Rate this Summary',
-                    style: AppTextStyles.titleStyle,
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      for (int i = 1; i <= 5; i++)
-                        GestureDetector(
-                          onTap: () {
-                            setState(() {
-                              _rating = i.toDouble();
-                            });
-                          },
-                          child: Icon(
-                            i <= _rating ? Icons.star : Icons.star_border,
-                            color: Colors.amber,
-                            size: 40,
+                  _buildCardImage(widget.summary['image'] as String? ?? ''),
+                  Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          widget.summary['title'] ?? 'Untitled Summary',
+                          style: AppTextStyles.headingStyleNoShadow
+                              .copyWith(color: AppColors.primaryTextColorDark),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Created on ${DateFormat('MMM d, yyyy').format(DateTime.parse(widget.summary['date'] as String? ?? DateTime.now().toIso8601String()))}',
+                          style: AppTextStyles.bodyTextStyle
+                              .copyWith(color: AppColors.altPriTextColorDark),
+                        ),
+                        const SizedBox(height: 24),
+                        Text(
+                          'Actions',
+                          style: AppTextStyles.titleStyle,
+                        ),
+                        const SizedBox(height: 16),
+                        OpenContainer(
+                          transitionDuration: const Duration(milliseconds: 500),
+                          openBuilder: (context, _) =>
+                              ViewSummary(summary: widget.summary),
+                          closedBuilder: (context, openContainer) =>
+                              AnimatedButton(
+                            text: 'View Summary',
+                            onPressed: openContainer,
+                            backgroundColor: AppColors.gradientStart,
+                            textColor: AppColors.primaryButtonTextColor,
                           ),
                         ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  CustomTextArea(
-                    controller: _reviewController,
-                    hintText:
-                        'Share your feedback on this summary and suggest improvements for future summaries.',
-                    maxLines: 5,
-                  ),
-                  const SizedBox(height: 16),
-                  AnimatedButton(
-                    text: 'Submit Review',
-                    onPressed: _submitReview,
-                    backgroundColor: AppColors.primaryButtonColor,
-                    textColor: AppColors.primaryButtonTextColor,
+                        const SizedBox(height: 12),
+                        AnimatedButton(
+                          text: 'Download Summary',
+                          onPressed: () => _downloadSummary(context),
+                          backgroundColor: AppColors.gradientMiddle,
+                          textColor: AppColors.primaryButtonTextColor,
+                        ),
+                        const SizedBox(height: 12),
+                        AnimatedButton(
+                          text: 'Delete Summary',
+                          onPressed: () => _deleteSummary(context),
+                          backgroundColor: AppColors.gradientEnd,
+                          textColor: AppColors.primaryButtonTextColor,
+                        ),
+                        const SizedBox(height: 24),
+                        Text(
+                          'Rate this Summary',
+                          style: AppTextStyles.titleStyle,
+                        ),
+                        const SizedBox(height: 8),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            for (int i = 1; i <= 5; i++)
+                              GestureDetector(
+                                onTap: () {
+                                  setState(() {
+                                    _rating = i.toDouble();
+                                  });
+                                },
+                                child: Icon(
+                                  i <= _rating ? Icons.star : Icons.star_border,
+                                  color: Colors.amber,
+                                  size: 40,
+                                ),
+                              ),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+                        CustomTextArea(
+                          controller: _reviewController,
+                          hintText:
+                              'Share your feedback on this summary and suggest improvements for future summaries.',
+                          maxLines: 5,
+                        ),
+                        const SizedBox(height: 16),
+                        AnimatedButton(
+                          text: 'Submit Review',
+                          onPressed: _submitReview,
+                          backgroundColor: AppColors.primaryButtonColor,
+                          textColor: AppColors.primaryButtonTextColor,
+                        ),
+                      ],
+                    ),
                   ),
                 ],
               ),
             ),
-          ],
+          ),
+          bottomNavigationBar: const CustomBottomNavBar(),
         ),
-      ),
+        if (_isLoading) const Loading(),
+      ],
     );
   }
 
-  void _viewSummary(BuildContext context) {
-    Navigator.of(context).push(
-      PageRouteBuilder(
-        pageBuilder: (context, animation, secondaryAnimation) =>
-            const ViewSummary(
-          summary: {},
-        ),
-        transitionsBuilder: (context, animation, secondaryAnimation, child) {
-          return FadeTransition(opacity: animation, child: child);
-        },
-      ),
-    );
-  }
-
-  void _downloadSummary(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: Text('Downloading', style: AppTextStyles.titleStyle),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const CircularProgressIndicator(
-                  color: AppColors.primaryButtonColor),
-              const SizedBox(height: 16),
-              Text(
-                'Downloading summary...',
-                style: AppTextStyles.bodyTextStyle
-                    .copyWith(color: AppColors.primaryTextColorDark),
-              ),
-            ],
+  Widget _buildCardImage(String imageUrl) {
+    return Image.network(
+      imageUrl,
+      width: double.infinity,
+      height: 200,
+      fit: BoxFit.cover,
+      loadingBuilder: (context, child, loadingProgress) {
+        if (loadingProgress == null) return child;
+        return Center(
+          child: CircularProgressIndicator(
+            value: loadingProgress.expectedTotalBytes != null
+                ? loadingProgress.cumulativeBytesLoaded /
+                    loadingProgress.expectedTotalBytes!
+                : null,
           ),
         );
       },
+      errorBuilder: (context, error, stackTrace) {
+        return Image.asset(
+          'assets/images/card.png',
+          width: double.infinity,
+          height: 200,
+          fit: BoxFit.cover,
+        );
+      },
     );
-
-    // Simulate download process
-    Future.delayed(const Duration(seconds: 2), () {
-      Navigator.of(context).pop(); // Close the download dialog
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content:
-              Text('Summary downloaded', style: AppTextStyles.bodyTextStyle),
-          backgroundColor: AppColors.gradientMiddle,
-        ),
-      );
-    });
   }
 
-  void _deleteSummary(BuildContext context) {
-    showDialog(
+  Future<void> _downloadSummary(BuildContext context) async {
+    setState(() => _isLoading = true);
+    try {
+      // Simulate download process
+      await Future.delayed(const Duration(seconds: 2));
+      if (!mounted) return;
+      Fluttertoast.showToast(
+        msg: "Summary downloaded",
+        toastLength: Toast.LENGTH_SHORT,
+        gravity: ToastGravity.BOTTOM,
+        backgroundColor: AppColors.gradientMiddle,
+        textColor: Colors.white,
+      );
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _deleteSummary(BuildContext context) async {
+    final bool? confirmDelete = await showDialog<bool>(
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          title: Text('Delete Summary', style: AppTextStyles.titleStyle),
+          backgroundColor: AppColors.textFieldFillColor,
+          title: Text(
+            'Delete Summary',
+            style: AppTextStyles.titleStyle
+                .copyWith(color: AppColors.primaryTextColor),
+          ),
           content: Text(
             'Are you sure you want to delete this summary?',
             style: AppTextStyles.bodyTextStyle
-                .copyWith(color: AppColors.primaryTextColorDark),
+                .copyWith(color: AppColors.primaryTextColor),
           ),
           actions: [
-            TextButton(
-              child: const Text('Cancel',
-                  style: TextStyle(color: AppColors.primaryButtonColor)),
-              onPressed: () => Navigator.of(context).pop(),
+            ElevatedButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.gradientStart,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(20),
+                ),
+              ),
+              child: Text(
+                'Cancel',
+                style: AppTextStyles.buttonTextStyle,
+              ),
             ),
-            TextButton(
-              child: const Text('Delete', style: TextStyle(color: Colors.red)),
-              onPressed: () {
-                Navigator.of(context).pop();
-                // Show deletion animation
-                _showDeletionAnimation(context);
-              },
+            ElevatedButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.gradientEnd,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(20),
+                ),
+              ),
+              child: Text(
+                'Delete',
+                style: AppTextStyles.buttonTextStyle,
+              ),
             ),
           ],
         );
       },
     );
-  }
 
-  void _showDeletionAnimation(BuildContext context) {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const CircularProgressIndicator(),
-              const SizedBox(height: 16),
-              Text(
-                'Deleting summary...',
-                style: AppTextStyles.bodyTextStyle
-                    .copyWith(color: AppColors.primaryTextColorDark),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-
-    // Simulate deletion process
-    Future.delayed(const Duration(seconds: 2), () {
-      Navigator.of(context).pop(); // Close the deletion dialog
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Summary deleted', style: AppTextStyles.bodyTextStyle),
+    if (confirmDelete == true) {
+      setState(() => _isLoading = true);
+      try {
+        // Simulate deletion process
+        await Future.delayed(const Duration(seconds: 2));
+        if (!mounted) return;
+        Fluttertoast.showToast(
+          msg: "Summary deleted",
+          toastLength: Toast.LENGTH_SHORT,
+          gravity: ToastGravity.BOTTOM,
           backgroundColor: AppColors.gradientMiddle,
-        ),
-      );
-      // Here you would typically navigate back or refresh the list
-    });
+          textColor: Colors.white,
+        );
+        // Here you would typically navigate back or refresh the list
+      } finally {
+        if (mounted) setState(() => _isLoading = false);
+      }
+    }
   }
 
-  void _submitReview() {
-    // TODO: Implement review submission logic
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Review submitted successfully',
-            style: AppTextStyles.bodyTextStyle),
+  Future<void> _submitReview() async {
+    setState(() => _isLoading = true);
+    try {
+      // TODO: Implement review submission logic
+      await Future.delayed(const Duration(seconds: 2)); // Simulate API call
+      if (!mounted) return;
+      Fluttertoast.showToast(
+        msg: "Review submitted successfully",
+        toastLength: Toast.LENGTH_SHORT,
+        gravity: ToastGravity.BOTTOM,
         backgroundColor: AppColors.gradientMiddle,
-      ),
-    );
+        textColor: Colors.white,
+      );
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
   }
 
   @override
   void dispose() {
     _reviewController.dispose();
     super.dispose();
+  }
+
+  Future<void> _handleRefresh() async {
+    await Future.delayed(const Duration(seconds: 2));
   }
 }

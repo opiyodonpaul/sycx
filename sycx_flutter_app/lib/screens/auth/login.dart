@@ -34,6 +34,8 @@ class LoginState extends State<Login> {
           msg: "Login failed",
           toastLength: Toast.LENGTH_SHORT,
           gravity: ToastGravity.BOTTOM,
+          backgroundColor: AppColors.gradientMiddle,
+          textColor: Colors.white,
         );
       }
     }
