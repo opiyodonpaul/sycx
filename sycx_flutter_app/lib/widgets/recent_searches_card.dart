@@ -61,28 +61,57 @@ class RecentSearchesCard extends StatelessWidget {
                       child: Container(
                         margin: const EdgeInsets.all(1),
                         child: Card(
-                          elevation: 2,
-                          color: AppColors.textFieldFillColor,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: ListTile(
-                            contentPadding:
-                                const EdgeInsets.fromLTRB(16, 4, 16, 4),
-                            leading: const Icon(Icons.history,
-                                color: AppColors.secondaryTextColor),
-                            title: Text(
-                              searches[index],
-                              style: AppTextStyles.bodyTextStyle,
+                            elevation: 2,
+                            color: AppColors.textFieldFillColor,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
                             ),
-                            trailing: IconButton(
-                              icon: const Icon(Icons.close,
-                                  size: 20,
-                                  color: AppColors.secondaryTextColor),
-                              onPressed: () => onRemoveSearch(index),
-                            ),
-                          ),
-                        ),
+                            child: ListTile(
+                              contentPadding:
+                                  const EdgeInsets.fromLTRB(16, 4, 16, 4),
+                              leading: const Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    Icons.history,
+                                    color: AppColors.primaryButtonColor,
+                                  ),
+                                  SizedBox(width: 8),
+                                  VerticalDivider(
+                                    color: AppColors.altPriTextColor,
+                                    thickness: 1,
+                                    width: 1,
+                                  ),
+                                  SizedBox(width: 8),
+                                ],
+                              ),
+                              title: Text(
+                                searches[index],
+                                style: AppTextStyles.bodyTextStyle,
+                              ),
+                              trailing: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const SizedBox(width: 8),
+                                  const VerticalDivider(
+                                    color: AppColors.altPriTextColor,
+                                    thickness: 1,
+                                    width: 1,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  IconButton(
+                                    icon: const Icon(
+                                      Icons.close,
+                                      size: 20,
+                                      color: AppColors.gradientEnd,
+                                    ),
+                                    onPressed: () => onRemoveSearch(index),
+                                    constraints: const BoxConstraints(),
+                                    padding: EdgeInsets.zero,
+                                  ),
+                                ],
+                              ),
+                            )),
                       ),
                     ),
                   ),

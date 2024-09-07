@@ -56,6 +56,12 @@ class AppTextStyles {
     color: AppColors.primaryTextColorDark,
   );
 
+  static final TextStyle titleStyleX = GoogleFonts.exo2(
+    fontSize: 25,
+    fontWeight: FontWeight.w700,
+    color: AppColors.primaryTextColorDark,
+  );
+
   static final TextStyle buttonTextStyle = GoogleFonts.exo2(
     fontSize: 18,
     fontWeight: FontWeight.w600,
