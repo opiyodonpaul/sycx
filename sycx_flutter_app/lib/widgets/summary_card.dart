@@ -1,92 +1,131 @@
 import 'package:flutter/material.dart';
-import 'package:sycx_flutter_app/models/summary.dart';
+import 'package:animations/animations.dart';
+import 'package:intl/intl.dart';
+import 'package:sycx_flutter_app/utils/constants.dart';
 
 class SummaryCard extends StatelessWidget {
-  final String title;
-  final IconData icon;
-  final VoidCallback onTap;
-  final Summary? summary;
-  final VoidCallback? onView;
-  final VoidCallback? onDelete;
-  final VoidCallback? onDownload;
+  final Map<String, dynamic> summary;
+  final Function(String) onTogglePin;
 
   const SummaryCard({
     super.key,
-    required this.title,
-    required this.icon,
-    required this.onTap,
-    this.summary,
-    this.onView,
-    this.onDelete,
-    this.onDownload,
+    required this.summary,
+    required this.onTogglePin,
   });
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 300),
-      curve: Curves.easeInOut,
-      margin: const EdgeInsets.all(10),
-      padding: const EdgeInsets.all(15),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.blueAccent.withOpacity(0.2),
-            blurRadius: 10,
-            spreadRadius: 5,
-            offset: const Offset(0, 5),
-          ),
-        ],
-        borderRadius: BorderRadius.circular(20),
+    return OpenContainer(
+      transitionDuration: const Duration(milliseconds: 500),
+      openBuilder: (context, _) => Scaffold(
+        appBar: AppBar(title: Text(summary['title']!)),
+        body: const Center(child: Text('Summary details go here')),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            title,
-            style: const TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 10),
-          if (summary != null)
-            Text(
-              summary!.summaryText.length > 100
-                  ? '${summary!.summaryText.substring(0, 100)}...'
-                  : summary!.summaryText,
-              style: TextStyle(
-                fontSize: 14,
-                color: Colors.grey[700],
+      closedBuilder: (context, openContainer) => GestureDetector(
+        onTap: openContainer,
+        child: Stack(
+          children: [
+            Container(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.1),
+                    blurRadius: 8,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(16),
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    _buildCardImage(summary['image']!),
+                    Container(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [
+                            Colors.transparent,
+                            Colors.black.withOpacity(0.7)
+                          ],
+                        ),
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.all(12),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            summary['title']!,
+                            style: AppTextStyles.subheadingStyle
+                                .copyWith(color: AppColors.primaryTextColor),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Created on ${DateFormat('MMM d, yyyy').format(DateTime.parse(summary['date']!))}',
+                            style: AppTextStyles.bodyTextStyle
+                                .copyWith(color: AppColors.secondaryTextColor),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
-          const Spacer(),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              if (onView != null)
-                IconButton(
-                  icon: const Icon(Icons.visibility),
-                  color: Colors.blueAccent,
-                  onPressed: onView,
+            Positioned(
+              top: 8,
+              right: 8,
+              child: GestureDetector(
+                onTap: () => onTogglePin(summary['id']),
+                child: AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 300),
+                  transitionBuilder:
+                      (Widget child, Animation<double> animation) {
+                    return ScaleTransition(scale: animation, child: child);
+                  },
+                  child: Icon(
+                    summary['isPinned']
+                        ? Icons.push_pin
+                        : Icons.push_pin_outlined,
+                    key: ValueKey<bool>(summary['isPinned']),
+                    color: Colors.white,
+                  ),
                 ),
-              if (onDownload != null)
-                IconButton(
-                  icon: const Icon(Icons.download),
-                  color: Colors.green,
-                  onPressed: onDownload,
-                ),
-              if (onDelete != null)
-                IconButton(
-                  icon: const Icon(Icons.delete),
-                  color: Colors.redAccent,
-                  onPressed: onDelete,
-                ),
-            ],
-          ),
-        ],
+              ),
+            ),
+          ],
+        ),
       ),
+    );
+  }
+
+  Widget _buildCardImage(String imageUrl) {
+    return Image.network(
+      imageUrl,
+      fit: BoxFit.cover,
+      loadingBuilder: (context, child, loadingProgress) {
+        if (loadingProgress == null) return child;
+        return Center(
+          child: CircularProgressIndicator(
+            value: loadingProgress.expectedTotalBytes != null
+                ? loadingProgress.cumulativeBytesLoaded /
+                    loadingProgress.expectedTotalBytes!
+                : null,
+          ),
+        );
+      },
+      errorBuilder: (context, error, stackTrace) {
+        return Image.asset(
+          'assets/images/card.png',
+          fit: BoxFit.cover,
+        );
+      },
     );
   }
 }
