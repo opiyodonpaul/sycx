@@ -25,6 +25,7 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
               ? Colors.white.withOpacity(0.8)
               : Colors.transparent,
           elevation: 0,
+          automaticallyImplyLeading: false, // This line removes the back arrow
           flexibleSpace: Container(
             decoration: BoxDecoration(
               gradient: LinearGradient(

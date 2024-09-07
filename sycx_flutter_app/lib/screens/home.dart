@@ -1,13 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
 import 'package:sycx_flutter_app/dummy_data.dart';
+import 'package:sycx_flutter_app/screens/search_results.dart';
 import 'package:sycx_flutter_app/utils/constants.dart';
 import 'package:sycx_flutter_app/widgets/custom_app_bar.dart';
 import 'package:sycx_flutter_app/widgets/custom_bottom_nav_bar.dart';
 import 'package:sycx_flutter_app/widgets/custom_textfield.dart';
+import 'package:sycx_flutter_app/widgets/loading.dart';
 import 'package:sycx_flutter_app/widgets/summary_card.dart';
 import 'package:sycx_flutter_app/widgets/recent_searches_card.dart';
-import 'search_results.dart';
 
 class Home extends StatefulWidget {
   const Home({super.key});
@@ -23,6 +24,7 @@ class HomeState extends State<Home> with SingleTickerProviderStateMixin {
 
   List<Map<String, dynamic>> summaries = DummyData.summaries;
   List<String> searches = DummyData.searches;
+  bool _isLoading = true;
 
   @override
   void initState() {
@@ -38,7 +40,9 @@ class HomeState extends State<Home> with SingleTickerProviderStateMixin {
   Future<void> _loadData() async {
     await Future.delayed(const Duration(seconds: 2));
     if (mounted) {
-      setState(() {});
+      setState(() {
+        _isLoading = false;
+      });
       _animationController.forward();
     }
   }
@@ -61,24 +65,26 @@ class HomeState extends State<Home> with SingleTickerProviderStateMixin {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      extendBodyBehindAppBar: true,
-      appBar: CustomAppBar(
-        user: DummyData.user,
-        showBackground: false,
-        title: 'SycX',
-      ),
-      body: RefreshIndicator(
-        onRefresh: _handleRefresh,
-        child: SingleChildScrollView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          child: _buildBody(),
-        ),
-      ),
-      bottomNavigationBar: const CustomBottomNavBar(
-        currentRoute: '/home',
-      ),
-    );
+    return _isLoading
+        ? const Loading()
+        : Scaffold(
+            extendBodyBehindAppBar: true,
+            appBar: CustomAppBar(
+              user: DummyData.user,
+              showBackground: false,
+              title: 'SycX',
+            ),
+            body: RefreshIndicator(
+              onRefresh: _handleRefresh,
+              child: SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                child: _buildBody(),
+              ),
+            ),
+            bottomNavigationBar: const CustomBottomNavBar(
+              currentRoute: '/home',
+            ),
+          );
   }
 
   Widget _buildBody() {

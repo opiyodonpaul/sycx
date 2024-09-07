@@ -131,7 +131,9 @@ class SummaryDetailsState extends State<SummaryDetails> {
               ),
             ),
           ),
-          bottomNavigationBar: const CustomBottomNavBar(currentRoute: 'home',),
+          bottomNavigationBar: const CustomBottomNavBar(
+            currentRoute: '/summary_details',
+          ),
         ),
         if (_isLoading) const Loading(),
       ],

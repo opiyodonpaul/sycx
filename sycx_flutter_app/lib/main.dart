@@ -3,6 +3,7 @@ import 'package:sycx_flutter_app/screens/auth/forgot_password.dart';
 import 'package:sycx_flutter_app/screens/auth/login.dart';
 import 'package:sycx_flutter_app/screens/auth/register.dart';
 import 'package:sycx_flutter_app/screens/profile.dart';
+import 'package:sycx_flutter_app/screens/search_results.dart';
 import 'package:sycx_flutter_app/screens/splash.dart';
 import 'package:sycx_flutter_app/screens/summary_details.dart';
 import 'package:sycx_flutter_app/screens/upload.dart';
@@ -33,10 +34,11 @@ class MyApp extends StatelessWidget {
         '/login': (context) => const Login(),
         '/forgot_password': (context) => const ForgotPassword(),
         '/home': (context) => const Home(),
-        '/view_summary': (context) => const ViewSummary(
+        '/search': (context) => const SearchResults(searchQuery: ''),
+        '/summary_details': (context) => const SummaryDetails(
               summary: {},
             ),
-        '/summary_details': (context) => const SummaryDetails(
+        '/view_summary': (context) => const ViewSummary(
               summary: {},
             ),
         '/upload': (context) => const Upload(),

@@ -3,7 +3,6 @@ import 'package:sycx_flutter_app/utils/constants.dart';
 
 class CustomBottomNavBar extends StatelessWidget {
   final String currentRoute;
-
   const CustomBottomNavBar({super.key, required this.currentRoute});
 
   @override
@@ -47,7 +46,8 @@ class CustomBottomNavBar extends StatelessWidget {
           ],
           onTap: (index) {
             String route = ['/home', '/upload', '/summaries'][index];
-            if (route != currentRoute) {
+            String currentParentRoute = _getParentRoute(currentRoute);
+            if (currentParentRoute != route || currentRoute != route) {
               Navigator.pushReplacementNamed(context, route);
             }
           },
@@ -67,7 +67,7 @@ class CustomBottomNavBar extends StatelessWidget {
         padding: const EdgeInsets.all(6),
         decoration: BoxDecoration(
           shape: BoxShape.circle,
-          color: currentRoute == route
+          color: _getParentRoute(currentRoute) == route
               ? Colors.white.withOpacity(0.2)
               : Colors.transparent,
         ),
@@ -80,8 +80,27 @@ class CustomBottomNavBar extends StatelessWidget {
     );
   }
 
+  String _getParentRoute(String route) {
+    if (['/home', '/profile', '/search', '/summary_details', '/view_summary']
+        .contains(route)) {
+      return '/home';
+    } else if (['/upload', '/profile'].contains(route)) {
+      return '/upload';
+    } else if ([
+      '/summaries',
+      '/profile',
+      '/search',
+      '/summary_details',
+      '/view_summary'
+    ].contains(route)) {
+      return '/summaries';
+    }
+    return route;
+  }
+
   int _getCurrentIndex() {
-    switch (currentRoute) {
+    String parentRoute = _getParentRoute(currentRoute);
+    switch (parentRoute) {
       case '/home':
         return 0;
       case '/upload':
