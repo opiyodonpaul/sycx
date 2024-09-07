@@ -11,7 +11,7 @@ class UserAvatar extends StatelessWidget {
     return PopupMenuButton(
       offset: const Offset(0, 56),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      color: Colors.white,
+      color: AppColors.textFieldFillColor,
       itemBuilder: (context) => [
         PopupMenuItem(
           enabled: false,
@@ -24,15 +24,16 @@ class UserAvatar extends StatelessWidget {
               Text('Logged in as ${user['email']}',
                   style: AppTextStyles.bodyTextStyle.copyWith(
                       fontSize: 12, color: AppColors.secondaryTextColor)),
-              const Divider(),
+              const Divider(color: AppColors.textFieldBorderColor),
             ],
           ),
         ),
         PopupMenuItem(
           child: TextButton.icon(
             icon: const Icon(Icons.person, color: AppColors.primaryButtonColor),
-            label: const Text('Profile',
-                style: TextStyle(color: AppColors.primaryButtonColor)),
+            label: Text('Profile',
+                style: AppTextStyles.bodyTextStyle
+                    .copyWith(color: AppColors.primaryButtonColor)),
             onPressed: () {
               Navigator.of(context).pushNamed('/profile');
             },
@@ -40,8 +41,10 @@ class UserAvatar extends StatelessWidget {
         ),
         PopupMenuItem(
           child: TextButton.icon(
-            icon: const Icon(Icons.logout, color: Colors.red),
-            label: const Text('Logout', style: TextStyle(color: Colors.red)),
+            icon: const Icon(Icons.logout, color: AppColors.gradientEnd),
+            label: Text('Logout',
+                style: AppTextStyles.bodyTextStyle
+                    .copyWith(color: AppColors.gradientEnd)),
             onPressed: () {
               // Implement actual logout logic here
             },
