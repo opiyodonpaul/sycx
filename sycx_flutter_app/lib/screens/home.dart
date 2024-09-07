@@ -75,7 +75,9 @@ class HomeState extends State<Home> with SingleTickerProviderStateMixin {
           child: _buildBody(),
         ),
       ),
-      bottomNavigationBar: const CustomBottomNavBar(),
+      bottomNavigationBar: const CustomBottomNavBar(
+        currentRoute: '/home',
+      ),
     );
   }
 
