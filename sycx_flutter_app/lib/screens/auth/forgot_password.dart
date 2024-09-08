@@ -16,13 +16,13 @@ class ForgotPassword extends StatefulWidget {
 class ForgotPasswordState extends State<ForgotPassword> {
   final _formKey = GlobalKey<FormState>();
   final _emailFocusNode = FocusNode();
-  String _email = '';
+  final _emailController = TextEditingController();
   bool _isLoading = false;
 
   void _resetPassword() async {
     if (_formKey.currentState!.validate()) {
       setState(() => _isLoading = true);
-      bool success = await Auth.resetPassword(_email);
+      bool success = await Auth.resetPassword(_emailController.text);
       setState(() => _isLoading = false);
       if (success) {
         Fluttertoast.showToast(
@@ -48,7 +48,7 @@ class ForgotPasswordState extends State<ForgotPassword> {
   Future<void> _handleRefresh() async {
     setState(() {
       _formKey.currentState?.reset();
-      _email = '';
+      _emailController.clear();
     });
     return Future.delayed(const Duration(seconds: 1));
   }
@@ -56,6 +56,7 @@ class ForgotPasswordState extends State<ForgotPassword> {
   @override
   void dispose() {
     _emailFocusNode.dispose();
+    _emailController.dispose();
     super.dispose();
   }
 
@@ -115,12 +116,13 @@ class ForgotPasswordState extends State<ForgotPassword> {
                               const SizedBox(height: 60),
                               CustomTextField(
                                 hintText: 'Email',
-                                onChanged: (value) => _email = value,
+                                onChanged: (value) => {},
                                 validator: (value) =>
                                     value!.isEmpty ? 'Enter email' : null,
                                 focusNode: _emailFocusNode,
                                 onFieldSubmitted: (_) => _resetPassword(),
                                 prefixIcon: Icons.email,
+                                controller: _emailController,
                               ),
                               const SizedBox(height: 24),
                               AnimatedButton(
