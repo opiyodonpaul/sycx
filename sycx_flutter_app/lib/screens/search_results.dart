@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
-import 'package:intl/intl.dart';
-import 'package:animations/animations.dart';
+import 'package:sycx_flutter_app/utils/constants.dart';
+import 'package:sycx_flutter_app/widgets/custom_app_bar_mini.dart';
+import 'package:sycx_flutter_app/widgets/loading.dart';
+import 'package:sycx_flutter_app/widgets/summary_card.dart';
+import 'package:sycx_flutter_app/dummy_data.dart';
 
 class SearchResults extends StatefulWidget {
   final String searchQuery;
@@ -13,166 +15,132 @@ class SearchResults extends StatefulWidget {
 }
 
 class SearchResultsState extends State<SearchResults> {
-  // Dummy search results (replace with actual search logic later)
   late List<Map<String, dynamic>> searchResults;
+  bool _isLoading = false;
 
   @override
   void initState() {
     super.initState();
-    // Simulate search results based on the query
-    searchResults = List.generate(
-      10,
-      (index) => {
-        'id': 'search_$index',
-        'title': '${widget.searchQuery} Result $index',
-        'image': 'https://picsum.photos/seed/$index/300/200',
-        'date': DateTime.now().subtract(Duration(days: index)).toString(),
-        'isPinned': false,
-      },
-    );
+    _performSearch();
+  }
+
+  void _performSearch() {
+    setState(() => _isLoading = true);
+
+    // Filter summaries based on the search query
+    searchResults = DummyData.summaries.where((summary) {
+      final title = summary['title'].toString().toLowerCase();
+      final query = widget.searchQuery.toLowerCase();
+      return title.contains(query);
+    }).toList();
+
+    setState(() => _isLoading = false);
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text('Search Results: ${widget.searchQuery}'),
-      ),
-      body: RefreshIndicator(
-        onRefresh: _handleRefresh,
-        child: SingleChildScrollView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          child: Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Results for "${widget.searchQuery}"',
-                  style: GoogleFonts.exo2(
-                      fontSize: 24, fontWeight: FontWeight.bold),
+      appBar: CustomAppBarMini(title: 'Search Results: ${widget.searchQuery}'),
+      body: Stack(
+        children: [
+          RefreshIndicator(
+            onRefresh: _handleRefresh,
+            child: SingleChildScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Results for "${widget.searchQuery}"',
+                      style: AppTextStyles.titleStyle,
+                    ),
+                    const SizedBox(height: 16),
+                    _buildSearchResults(),
+                  ],
                 ),
-                const SizedBox(height: 16),
-                GridView.builder(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 2,
-                    crossAxisSpacing: 16,
-                    mainAxisSpacing: 16,
-                    childAspectRatio: 0.75,
-                  ),
-                  itemCount: searchResults.length,
-                  itemBuilder: (context, index) {
-                    return _buildSummaryCard(searchResults[index]);
-                  },
-                ),
-              ],
+              ),
             ),
           ),
-        ),
+          if (_isLoading) const Loading(),
+        ],
       ),
     );
   }
 
-  Widget _buildSummaryCard(Map<String, dynamic> summary) {
-    return OpenContainer(
-      transitionDuration: const Duration(milliseconds: 500),
-      openBuilder: (context, _) => Scaffold(
-        appBar: AppBar(title: Text(summary['title']!)),
-        body: const Center(child: Text('Summary details go here')),
-      ),
-      closedBuilder: (context, openContainer) => GestureDetector(
-        onTap: openContainer,
-        child: Stack(
-          children: [
-            Container(
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(16),
-                image: DecorationImage(
-                  image: NetworkImage(summary['image']!),
-                  fit: BoxFit.cover,
-                ),
-              ),
-              child: Container(
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(16),
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [Colors.transparent, Colors.black.withOpacity(0.7)],
-                  ),
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        summary['title']!,
-                        style: GoogleFonts.exo2(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Created on ${DateFormat('MMM d, yyyy').format(DateTime.parse(summary['date']!))}',
-                        style: GoogleFonts.roboto(
-                            fontSize: 12, color: Colors.white70),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-            Positioned(
-              top: 8,
-              right: 8,
-              child: GestureDetector(
-                onTap: () => _togglePin(summary['id']),
-                child: AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 300),
-                  transitionBuilder:
-                      (Widget child, Animation<double> animation) {
-                    return ScaleTransition(scale: animation, child: child);
-                  },
-                  child: Icon(
-                    summary['isPinned']
-                        ? Icons.push_pin
-                        : Icons.push_pin_outlined,
-                    key: ValueKey<bool>(summary['isPinned']),
-                    color: Colors.white,
-                  ),
-                ),
-              ),
+  Widget _buildSearchResults() {
+    if (searchResults.isEmpty) {
+      return Container(
+        padding: const EdgeInsets.all(defaultPadding),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              AppColors.gradientStart,
+              AppColors.gradientMiddle,
+              AppColors.gradientEnd,
+            ],
+          ),
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.1),
+              blurRadius: 10,
+              offset: const Offset(0, 5),
             ),
           ],
         ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(
+              Icons.error_outline,
+              size: 48,
+              color: AppColors.primaryTextColor,
+            ),
+            const SizedBox(height: defaultPadding),
+            Text(
+              'No Results Found',
+              style: AppTextStyles.headingStyleNoShadow.copyWith(fontSize: 24),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: defaultPadding / 2),
+            Text(
+              'We couldn\'t find any results for "${widget.searchQuery}".\nPlease try a different search term.',
+              style: AppTextStyles.bodyTextStyle
+                  .copyWith(color: AppColors.altPriTextColor),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      );
+    }
+
+    return GridView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 2,
+        crossAxisSpacing: 16,
+        mainAxisSpacing: 16,
+        childAspectRatio: 0.75,
       ),
+      itemCount: searchResults.length,
+      itemBuilder: (context, index) {
+        return SummaryCard(
+          summary: searchResults[index],
+          onTogglePin: (_) {}, // Empty function as pinning is not used here
+          isEmpty: false,
+        );
+      },
     );
   }
 
-  void _togglePin(String id) {
-    setState(() {
-      final summaryIndex =
-          searchResults.indexWhere((summary) => summary['id'] == id);
-      if (summaryIndex != -1) {
-        searchResults[summaryIndex]['isPinned'] =
-            !searchResults[summaryIndex]['isPinned'];
-      }
-    });
-  }
-
   Future<void> _handleRefresh() async {
-    // Simulate a network request
-    await Future.delayed(const Duration(seconds: 2));
-
-    // In a real app, you would fetch new search results from the server here
-    setState(() {
-      // Update the search results for demonstration purposes
-      searchResults.shuffle();
-    });
+    setState(() => _isLoading = true);
+    await Future.delayed(const Duration(seconds: 1)); // Simulate delay
+    _performSearch();
   }
 }
