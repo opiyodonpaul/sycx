@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
+import 'package:fluttertoast/fluttertoast.dart';
 import 'package:sycx_flutter_app/dummy_data.dart';
 import 'package:sycx_flutter_app/screens/search_results.dart';
 import 'package:sycx_flutter_app/utils/constants.dart';
@@ -360,6 +361,13 @@ class HomeState extends State<Home> with SingleTickerProviderStateMixin {
             !(summaries[summaryIndex]['isPinned'] as bool);
       }
     });
+    Fluttertoast.showToast(
+      msg: "Summary Pinned",
+      toastLength: Toast.LENGTH_SHORT,
+      gravity: ToastGravity.BOTTOM,
+      backgroundColor: AppColors.gradientMiddle,
+      textColor: Colors.white,
+    );
   }
 
   Future<void> _handleRefresh() async {
