@@ -15,8 +15,8 @@ class Profile extends StatefulWidget {
 }
 
 class ProfileState extends State<Profile> {
-  String _username = '';
-  String _email = '';
+  final _usernameController = TextEditingController();
+  final _emailController = TextEditingController();
   String _profilePic = '';
   bool _loading = false;
 
@@ -28,8 +28,8 @@ class ProfileState extends State<Profile> {
     try {
       bool success = await ProfileService.updateProfile(
         'user_id', // Pass user id here
-        _username,
-        _email,
+        _usernameController.text,
+        _emailController.text,
         _profilePic,
       );
 
@@ -51,6 +51,13 @@ class ProfileState extends State<Profile> {
         _loading = false;
       });
     }
+  }
+
+  @override
+  void dispose() {
+    _usernameController.dispose();
+    _emailController.dispose();
+    super.dispose();
   }
 
   @override
@@ -85,15 +92,17 @@ class ProfileState extends State<Profile> {
                   children: [
                     CustomTextField(
                       hintText: 'Username',
-                      onChanged: (value) => _username = value,
+                      onChanged: (value) => {},
                       validator: (value) =>
                           value!.isEmpty ? 'Enter a username' : null,
+                      controller: _usernameController,
                     ),
                     CustomTextField(
                       hintText: 'Email',
-                      onChanged: (value) => _email = value,
+                      onChanged: (value) => {},
                       validator: (value) =>
                           value!.isEmpty ? 'Enter an email' : null,
+                      controller: _emailController,
                     ),
                     TextButton(
                       onPressed: () async {

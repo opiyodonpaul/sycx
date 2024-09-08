@@ -21,6 +21,7 @@ class CustomTextField extends StatelessWidget {
     this.onFieldSubmitted,
     this.prefixIcon,
     this.suffixIcon,
+    required TextEditingController controller,
   });
 
   @override

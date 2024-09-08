@@ -22,9 +22,11 @@ class HomeState extends State<Home> with SingleTickerProviderStateMixin {
   bool _showAppBarBackground = false;
   late AnimationController _animationController;
 
-  List<Map<String, dynamic>> summaries = DummyData.summaries;
-  List<String> searches = DummyData.searches;
+  List summaries = DummyData.summaries;
+  List<String> searches = List<String>.from(DummyData.searches);
   bool _isLoading = true;
+  final TextEditingController _searchController = TextEditingController();
+  final FocusNode _searchFocusNode = FocusNode();
 
   @override
   void initState() {
@@ -52,6 +54,8 @@ class HomeState extends State<Home> with SingleTickerProviderStateMixin {
     _scrollController.removeListener(_onScroll);
     _scrollController.dispose();
     _animationController.dispose();
+    _searchController.dispose();
+    _searchFocusNode.dispose();
     super.dispose();
   }
 
@@ -127,6 +131,9 @@ class HomeState extends State<Home> with SingleTickerProviderStateMixin {
               setState(() {
                 searches.removeAt(index);
               });
+            },
+            onEmptySearchTap: () {
+              _searchFocusNode.requestFocus();
             },
           ),
         ),
@@ -238,17 +245,26 @@ class HomeState extends State<Home> with SingleTickerProviderStateMixin {
           horizontal: 24,
         ),
         child: CustomTextField(
+          controller: _searchController,
+          focusNode: _searchFocusNode,
           hintText: 'Search for summaries...',
           onChanged: (value) {},
           validator: (value) => null,
           prefixIcon: Icons.search,
           onFieldSubmitted: (value) {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => SearchResults(searchQuery: value),
-              ),
-            );
+            if (value.isNotEmpty) {
+              setState(() {
+                if (!searches.contains(value)) {
+                  searches.insert(0, value);
+                }
+              });
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => SearchResults(searchQuery: value),
+                ),
+              );
+            }
           },
         ),
       ),
@@ -260,22 +276,23 @@ class HomeState extends State<Home> with SingleTickerProviderStateMixin {
       animation: _animationController,
       builder: (context, child) {
         return Transform.translate(
-            offset: Tween<Offset>(
-              begin: const Offset(0, 50),
-              end: Offset.zero,
-            )
+          offset: Tween<Offset>(
+            begin: const Offset(0, 50),
+            end: Offset.zero,
+          )
+              .animate(CurvedAnimation(
+                  parent: _animationController,
+                  curve: const Interval(0.4, 1.0, curve: Curves.easeOut)))
+              .value,
+          child: Opacity(
+            opacity: Tween<double>(begin: 0.0, end: 1.0)
                 .animate(CurvedAnimation(
                     parent: _animationController,
                     curve: const Interval(0.4, 1.0, curve: Curves.easeOut)))
                 .value,
-            child: Opacity(
-              opacity: Tween<double>(begin: 0.0, end: 1.0)
-                  .animate(CurvedAnimation(
-                      parent: _animationController,
-                      curve: const Interval(0.4, 1.0, curve: Curves.easeOut)))
-                  .value,
-              child: child,
-            ));
+            child: child,
+          ),
+        );
       },
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 8),
@@ -298,7 +315,7 @@ class HomeState extends State<Home> with SingleTickerProviderStateMixin {
                 crossAxisSpacing: 16,
                 mainAxisSpacing: 16,
               ),
-              itemCount: summaries.length,
+              itemCount: summaries.isEmpty ? 1 : summaries.length,
               itemBuilder: (context, index) {
                 return AnimationConfiguration.staggeredGrid(
                   position: index,
@@ -306,10 +323,23 @@ class HomeState extends State<Home> with SingleTickerProviderStateMixin {
                   columnCount: 2,
                   child: ScaleAnimation(
                     child: FadeInAnimation(
-                      child: SummaryCard(
-                        summary: summaries[index],
-                        onTogglePin: _togglePin,
-                      ),
+                      child: summaries.isEmpty
+                          ? SummaryCard(
+                              summary: {
+                                'id': 'empty',
+                                'title': 'No summaries yet',
+                                'date': DateTime.now().toIso8601String(),
+                                'image': 'assets/images/card.png',
+                                'isPinned': false,
+                              },
+                              onTogglePin: (_) {},
+                              isEmpty: true,
+                            )
+                          : SummaryCard(
+                              summary: summaries[index],
+                              onTogglePin: _togglePin,
+                              isEmpty: false,
+                            ),
                     ),
                   ),
                 );

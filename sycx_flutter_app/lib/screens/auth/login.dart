@@ -17,16 +17,17 @@ class LoginState extends State<Login> {
   final _formKey = GlobalKey<FormState>();
   final _usernameFocusNode = FocusNode();
   final _passwordFocusNode = FocusNode();
-  String _username = '';
-  String _password = '';
+  final _usernameController = TextEditingController();
+  final _passwordController = TextEditingController();
   bool _obscurePassword = true;
-  bool _isLoading = false; // Add this line
+  bool _isLoading = false;
 
   void _login() async {
     if (_formKey.currentState!.validate()) {
-      setState(() => _isLoading = true); // Add this line
-      bool success = await Auth.login(_username, _password);
-      setState(() => _isLoading = false); // Add this line
+      setState(() => _isLoading = true);
+      bool success =
+          await Auth.login(_usernameController.text, _passwordController.text);
+      setState(() => _isLoading = false);
       if (success) {
         Navigator.pushReplacementNamed(context, '/home');
       } else {
@@ -44,8 +45,8 @@ class LoginState extends State<Login> {
   Future<void> _handleRefresh() async {
     setState(() {
       _formKey.currentState?.reset();
-      _username = '';
-      _password = '';
+      _usernameController.clear();
+      _passwordController.clear();
     });
     return Future.delayed(const Duration(seconds: 1));
   }
@@ -54,6 +55,8 @@ class LoginState extends State<Login> {
   void dispose() {
     _usernameFocusNode.dispose();
     _passwordFocusNode.dispose();
+    _usernameController.dispose();
+    _passwordController.dispose();
     super.dispose();
   }
 
@@ -67,8 +70,8 @@ class LoginState extends State<Login> {
         }
       },
       child: Scaffold(
-        body: _isLoading // Add this line
-            ? const Loading() // Add this line
+        body: _isLoading
+            ? const Loading()
             : RefreshIndicator(
                 onRefresh: _handleRefresh,
                 child: SingleChildScrollView(
@@ -113,7 +116,7 @@ class LoginState extends State<Login> {
                               const SizedBox(height: 60),
                               CustomTextField(
                                 hintText: 'Username',
-                                onChanged: (value) => _username = value,
+                                onChanged: (value) => {},
                                 validator: (value) =>
                                     value!.isEmpty ? 'Enter username' : null,
                                 focusNode: _usernameFocusNode,
@@ -122,12 +125,13 @@ class LoginState extends State<Login> {
                                       .requestFocus(_passwordFocusNode);
                                 },
                                 prefixIcon: Icons.person,
+                                controller: _usernameController,
                               ),
                               const SizedBox(height: 16),
                               CustomTextField(
                                 hintText: 'Password',
                                 obscureText: _obscurePassword,
-                                onChanged: (value) => _password = value,
+                                onChanged: (value) => {},
                                 validator: (value) =>
                                     value!.isEmpty ? 'Enter password' : null,
                                 focusNode: _passwordFocusNode,
@@ -146,6 +150,7 @@ class LoginState extends State<Login> {
                                     });
                                   },
                                 ),
+                                controller: _passwordController,
                               ),
                               const SizedBox(height: 16),
                               Center(

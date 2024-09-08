@@ -22,19 +22,19 @@ class RegisterState extends State<Register> {
   final _usernameFocusNode = FocusNode();
   final _emailFocusNode = FocusNode();
   final _passwordFocusNode = FocusNode();
-  String _username = '';
-  String _email = '';
-  String _password = '';
+  final _usernameController = TextEditingController();
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
   File? _selectedImage;
   bool _obscurePassword = true;
-  bool _isLoading = false; // Add this line
+  bool _isLoading = false;
 
   void _refreshForm() {
     setState(() {
       _formKey.currentState?.reset();
-      _username = '';
-      _email = '';
-      _password = '';
+      _usernameController.clear();
+      _emailController.clear();
+      _passwordController.clear();
       _selectedImage = null;
     });
   }
@@ -57,11 +57,11 @@ class RegisterState extends State<Register> {
         return;
       }
 
-      setState(() => _isLoading = true); // Add this line
+      setState(() => _isLoading = true);
       final base64Image = await convertFileToBase64(_selectedImage!);
-      bool success =
-          await Auth.register(_username, _email, _password, base64Image);
-      setState(() => _isLoading = false); // Add this line
+      bool success = await Auth.register(_usernameController.text,
+          _emailController.text, _passwordController.text, base64Image);
+      setState(() => _isLoading = false);
 
       if (success) {
         Navigator.pushReplacementNamed(context, '/home');
@@ -92,6 +92,9 @@ class RegisterState extends State<Register> {
     _usernameFocusNode.dispose();
     _emailFocusNode.dispose();
     _passwordFocusNode.dispose();
+    _usernameController.dispose();
+    _emailController.dispose();
+    _passwordController.dispose();
     super.dispose();
   }
 
@@ -105,8 +108,8 @@ class RegisterState extends State<Register> {
         }
       },
       child: Scaffold(
-        body: _isLoading // Add this line
-            ? const Loading() // Add this line
+        body: _isLoading
+            ? const Loading()
             : RefreshIndicator(
                 onRefresh: _handleRefresh,
                 child: SingleChildScrollView(
@@ -187,7 +190,7 @@ class RegisterState extends State<Register> {
                               const SizedBox(height: 24),
                               CustomTextField(
                                 hintText: 'Username',
-                                onChanged: (value) => _username = value,
+                                onChanged: (value) => {},
                                 validator: (value) =>
                                     value!.isEmpty ? 'Enter username' : null,
                                 focusNode: _usernameFocusNode,
@@ -196,11 +199,12 @@ class RegisterState extends State<Register> {
                                       .requestFocus(_emailFocusNode);
                                 },
                                 prefixIcon: Icons.person,
+                                controller: _usernameController,
                               ),
                               const SizedBox(height: 16),
                               CustomTextField(
                                 hintText: 'Email',
-                                onChanged: (value) => _email = value,
+                                onChanged: (value) => {},
                                 validator: (value) =>
                                     value!.isEmpty ? 'Enter email' : null,
                                 focusNode: _emailFocusNode,
@@ -209,12 +213,13 @@ class RegisterState extends State<Register> {
                                       .requestFocus(_passwordFocusNode);
                                 },
                                 prefixIcon: Icons.email,
+                                controller: _emailController,
                               ),
                               const SizedBox(height: 16),
                               CustomTextField(
                                 hintText: 'Password',
                                 obscureText: _obscurePassword,
-                                onChanged: (value) => _password = value,
+                                onChanged: (value) => {},
                                 validator: (value) =>
                                     value!.isEmpty ? 'Enter password' : null,
                                 focusNode: _passwordFocusNode,
@@ -233,6 +238,7 @@ class RegisterState extends State<Register> {
                                     });
                                   },
                                 ),
+                                controller: _passwordController,
                               ),
                               const SizedBox(height: 24),
                               AnimatedButton(
