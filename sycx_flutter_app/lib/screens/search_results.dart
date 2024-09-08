@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:sycx_flutter_app/utils/constants.dart';
 import 'package:sycx_flutter_app/widgets/custom_app_bar_mini.dart';
+import 'package:sycx_flutter_app/widgets/custom_bottom_nav_bar.dart';
 import 'package:sycx_flutter_app/widgets/loading.dart';
 import 'package:sycx_flutter_app/widgets/summary_card.dart';
 import 'package:sycx_flutter_app/dummy_data.dart';
@@ -39,34 +40,39 @@ class SearchResultsState extends State<SearchResults> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: CustomAppBarMini(title: 'Search Results: ${widget.searchQuery}'),
-      body: Stack(
-        children: [
-          RefreshIndicator(
-            onRefresh: _handleRefresh,
-            child: SingleChildScrollView(
-              physics: const AlwaysScrollableScrollPhysics(),
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Results for "${widget.searchQuery}"',
-                      style: AppTextStyles.titleStyle,
+    return _isLoading
+        ? const Loading()
+        : Scaffold(
+            appBar: CustomAppBarMini(
+                title: 'Search Results: ${widget.searchQuery}'),
+            body: Stack(
+              children: [
+                RefreshIndicator(
+                  onRefresh: _handleRefresh,
+                  child: SingleChildScrollView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    child: Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Results for "${widget.searchQuery}"',
+                            style: AppTextStyles.titleStyle,
+                          ),
+                          const SizedBox(height: 16),
+                          _buildSearchResults(),
+                        ],
+                      ),
                     ),
-                    const SizedBox(height: 16),
-                    _buildSearchResults(),
-                  ],
+                  ),
                 ),
-              ),
+              ],
             ),
-          ),
-          if (_isLoading) const Loading(),
-        ],
-      ),
-    );
+            bottomNavigationBar: const CustomBottomNavBar(
+              currentRoute: '/search',
+            ),
+          );
   }
 
   Widget _buildSearchResults() {
