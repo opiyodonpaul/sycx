@@ -1,43 +1,48 @@
 import 'dart:convert';
+import 'dart:math';
 import 'package:http/http.dart' as http;
+import 'package:sycx_flutter_app/dummy_data.dart';
 import 'package:sycx_flutter_app/models/summary.dart';
 import 'package:sycx_flutter_app/services/api_client.dart';
 import 'package:sycx_flutter_app/utils/secure_storage.dart';
 
 class SummaryService {
-  static final ApiClient _apiClient = ApiClient(httpClient: http.Client());
+  static final ApiClient apiClient = ApiClient(httpClient: http.Client());
 
   static Future<Summary> summarizeDocument(
-      String userId, dynamic document) async {
-    final token = await SecureStorage.getToken();
-    final file = await http.MultipartFile.fromPath('document', document.path);
-    final response = await _apiClient.post(
-      '/summarize',
-      headers: {
-        'Authorization': 'Bearer $token',
-      },
-      body: {
-        'user_id': userId,
-      },
-      authRequired: true,
-    );
-
-    if (response.statusCode == 200) {
-      return Summary.fromJson(jsonDecode(response.body));
+      String userId, dynamic document, Function(double) updateProgress) async {
+    // Simulate summarization process
+    final random = Random();
+    int totalSteps = 10;
+    for (int i = 0; i < totalSteps; i++) {
+      await Future.delayed(Duration(milliseconds: 500 + random.nextInt(1000)));
+      updateProgress((i + 1) / totalSteps);
     }
-    throw Exception('Failed to summarize document');
+
+    // Return a dummy summary
+    final dummySummary =
+        DummyData.summaries[random.nextInt(DummyData.summaries.length)];
+    return Summary.fromJson(dummySummary);
+  }
+
+  static Future<List<Summary>> getSummaries(String userId) async {
+    // Simulate API call delay
+    await Future.delayed(const Duration(seconds: 1));
+
+    // Return dummy summaries
+    return DummyData.summaries.map((json) => Summary.fromJson(json)).toList();
   }
 
   static Future<void> giveFeedback(
       String summaryId, String userId, String feedback) async {
     final token = await SecureStorage.getToken();
-    final response = await _apiClient.post(
+    final response = await apiClient.post(
       '/feedback',
       headers: {
         'Authorization': 'Bearer $token',
         'Content-Type': 'application/json'
       },
-      body: {'summary_id': summaryId, 'user_id': userId, 'feedback': feedback},
+      body: {'summaryid': summaryId, 'user_id': userId, 'feedback': feedback},
       authRequired: true,
     );
 
@@ -48,8 +53,8 @@ class SummaryService {
 
   static Future<void> deleteSummary(String summaryId, String userId) async {
     final token = await SecureStorage.getToken();
-    final response = await _apiClient.delete(
-      '/delete_summary?summary_id=$summaryId&user_id=$userId',
+    final response = await apiClient.delete(
+      '/deletesummary?summary_id=$summaryId&user_id=$userId',
       headers: {'Authorization': 'Bearer $token'},
       authRequired: true,
     );
@@ -61,8 +66,8 @@ class SummaryService {
 
   static Future<String> downloadSummary(String summaryId, String format) async {
     final token = await SecureStorage.getToken();
-    final response = await _apiClient.get(
-      '/download_summary?summary_id=$summaryId&format=$format',
+    final response = await apiClient.get(
+      '/downloadsummary?summary_id=$summaryId&format=$format',
       headers: {'Authorization': 'Bearer $token'},
       authRequired: true,
     );
@@ -75,8 +80,8 @@ class SummaryService {
 
   static Future<List<Summary>> getUserSummaries(String userId) async {
     final token = await SecureStorage.getToken();
-    final response = await _apiClient.get(
-      '/user_summaries?user_id=$userId',
+    final response = await apiClient.get(
+      '/usersummaries?user_id=$userId',
       headers: {'Authorization': 'Bearer $token'},
       authRequired: true,
     );

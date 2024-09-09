@@ -1,14 +1,18 @@
 class Summary {
-  final String id;
-  final String title;
-  final String content;
-  final String date;
+  final String? id;
+  final String? title;
+  final String? content;
+  final String? date;
+  final bool isPinned;
+  final String? image;
 
   Summary({
-    required this.id,
-    required this.title,
-    required this.content,
-    required this.date,
+    this.id,
+    this.title,
+    this.content,
+    this.date,
+    this.isPinned = false,
+    this.image,
   });
 
   factory Summary.fromJson(Map<String, dynamic> json) {
@@ -17,15 +21,8 @@ class Summary {
       title: json['title'],
       content: json['content'],
       date: json['date'],
+      isPinned: json['isPinned'] ?? false,
+      image: json['image'],
     );
-  }
-
-  Map<String, dynamic> toJson() {
-    return {
-      'id': id,
-      'title': title,
-      'content': content,
-      'date': date,
-    };
   }
 }

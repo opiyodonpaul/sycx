@@ -24,6 +24,8 @@ class UploadState extends State<Upload> with SingleTickerProviderStateMixin {
   double summaryDepth = 0;
   bool isLoading = false;
   late AnimationController _animationController;
+  double _progress = 0.0;
+  int _currentFileIndex = 0;
 
   @override
   void initState() {
@@ -71,28 +73,79 @@ class UploadState extends State<Upload> with SingleTickerProviderStateMixin {
     }
 
     setState(() {
-      isLoading = true;
+      _progress = 0.0;
+      _currentFileIndex = 0;
     });
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              backgroundColor: AppColors.textFieldFillColor,
+              title: Text(
+                'Summarizing',
+                style: AppTextStyles.titleStyle
+                    .copyWith(color: AppColors.primaryTextColor),
+              ),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  LinearProgressIndicator(
+                    value: _progress,
+                    backgroundColor:
+                        AppColors.secondaryTextColor.withOpacity(0.3),
+                    valueColor: AlwaysStoppedAnimation<Color>(
+                      Color.lerp(AppColors.gradientStart, AppColors.gradientEnd,
+                          _progress)!,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    '${(_progress * 100).toStringAsFixed(0)}%',
+                    style: AppTextStyles.bodyTextStyle
+                        .copyWith(color: AppColors.primaryTextColor),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Summarizing file ${_currentFileIndex + 1} of ${uploadedFiles.length}',
+                    style: AppTextStyles.bodyTextStyle.copyWith(
+                        color: AppColors.primaryTextColor, fontSize: 14),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
 
     try {
       const userId = 'artkins10';
       List<Summary> summaries = [];
 
-      for (var file in uploadedFiles) {
-        final summary = await SummaryService.summarizeDocument(userId, file);
+      for (var i = 0; i < uploadedFiles.length; i++) {
+        final file = uploadedFiles[i];
+        final summary = await SummaryService.summarizeDocument(
+          userId,
+          file,
+          (progress) {
+            setState(() {
+              _progress = (i + progress) / uploadedFiles.length;
+              _currentFileIndex = i;
+            });
+          },
+        );
         summaries.add(summary);
       }
 
-      setState(() {
-        isLoading = false;
-      });
+      Navigator.of(context).pop();
 
-      // Navigate to a new screen to display the summary
-      Navigator.pushNamed(context, '/summaries', arguments: summaries);
+      Navigator.pushNamed(context, '/summaries');
     } catch (e) {
-      setState(() {
-        isLoading = false;
-      });
+      Navigator.of(context).pop();
       Fluttertoast.showToast(
         msg: "Failed to summarize documents: ${e.toString()}",
         backgroundColor: AppColors.gradientEnd,
@@ -103,18 +156,20 @@ class UploadState extends State<Upload> with SingleTickerProviderStateMixin {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      extendBodyBehindAppBar: true,
-      appBar: CustomAppBar(
-        user: DummyData.user,
-        showBackground: false,
-        title: 'SycX',
-      ),
-      body: isLoading ? const Loading() : _buildBody(),
-      bottomNavigationBar: const CustomBottomNavBar(
-        currentRoute: '/upload',
-      ),
-    );
+    return isLoading
+        ? const Loading()
+        : Scaffold(
+            extendBodyBehindAppBar: true,
+            appBar: CustomAppBar(
+              user: DummyData.user,
+              showBackground: false,
+              title: 'SycX',
+            ),
+            body: isLoading ? const Loading() : _buildBody(),
+            bottomNavigationBar: const CustomBottomNavBar(
+              currentRoute: '/upload',
+            ),
+          );
   }
 
   Widget _buildBody() {
@@ -369,10 +424,10 @@ class UploadState extends State<Upload> with SingleTickerProviderStateMixin {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Preview Content (${DummyData.uploadedFiles.length} files)',
+            'Preview Content (${uploadedFiles.length} files)',
             style: AppTextStyles.titleStyle,
           ),
-          DummyData.uploadedFiles.isEmpty
+          uploadedFiles.isEmpty
               ? Card(
                   elevation: 2,
                   color: AppColors.textFieldFillColor,
@@ -403,20 +458,21 @@ class UploadState extends State<Upload> with SingleTickerProviderStateMixin {
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
                   padding: EdgeInsets.zero,
-                  itemCount: DummyData.uploadedFiles.length,
+                  itemCount: uploadedFiles.length,
                   itemBuilder: (context, index) {
-                    final file = DummyData.uploadedFiles[index];
+                    final file = uploadedFiles[index];
                     return Card(
                       color: AppColors.textFieldFillColor,
                       elevation: 1,
                       shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(8)),
                       child: ListTile(
-                        leading: Icon(_getFileIcon(file['type']),
+                        leading: Icon(_getFileIcon(file.extension),
                             color: AppColors.gradientMiddle),
-                        title: Text(file['name']!,
-                            style: AppTextStyles.bodyTextStyle),
-                        subtitle: Text(file['size']!,
+                        title:
+                            Text(file.name, style: AppTextStyles.bodyTextStyle),
+                        subtitle: Text(
+                            '${(file.size / 1024 / 1024).toStringAsFixed(2)} MB',
                             style: AppTextStyles.bodyTextStyle
                                 .copyWith(color: AppColors.secondaryTextColor)),
                         trailing: IconButton(
@@ -555,10 +611,13 @@ class UploadState extends State<Upload> with SingleTickerProviderStateMixin {
     switch (fileType?.toLowerCase()) {
       case 'pdf':
         return Icons.picture_as_pdf;
+      case 'doc':
       case 'docx':
         return Icons.description;
+      case 'xls':
       case 'xlsx':
         return Icons.table_chart;
+      case 'ppt':
       case 'pptx':
         return Icons.slideshow;
       default:

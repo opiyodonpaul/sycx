@@ -39,6 +39,38 @@ class DummyData {
       'date': '2023-08-22',
       'isPinned': false
     },
+    {
+      'id': '5',
+      'title': 'Artificial Intelligence Ethics',
+      'image':
+          'https://images.unsplash.com/photo-1620712943543-bcc4688e7485?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1470&q=80',
+      'date': '2023-09-05',
+      'isPinned': true
+    },
+    {
+      'id': '6',
+      'title': 'Climate Change',
+      'image':
+          'https://images.unsplash.com/photo-1611273426858-450e7f08d386?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1470&q=80',
+      'date': '2023-09-10',
+      'isPinned': false
+    },
+    {
+      'id': '7',
+      'title': 'Modern Art Movements',
+      'image':
+          'https://images.unsplash.com/photo-1536924940846-227afb31e2a5?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1470&q=80',
+      'date': '2023-09-15',
+      'isPinned': false
+    },
+    {
+      'id': '8',
+      'title': 'Blockchain Technology',
+      'image':
+          'https://images.unsplash.com/photo-1639322537504-6427a16b0a28?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1632&q=80',
+      'date': '2023-09-20',
+      'isPinned': true
+    },
   ];
 
   static final searches = [
@@ -48,7 +80,6 @@ class DummyData {
     'Cybersecurity',
   ];
 
-  // New dummy data for uploaded files
   static final uploadedFiles = [
     {
       'name': 'Research Paper.pdf',
