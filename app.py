@@ -96,39 +96,43 @@ def send_reset_email(email, reset_token, expiration_time):
 @app.route('/register', methods=['POST'])
 def register():
     try:
-        if 'profile_pic' not in request.form or not request.form:
-            return jsonify({'error': 'Missing profile picture or form data'}), 400
-
-        email = request.form.get('email')
-        username = request.form.get('username')
-        password = request.form.get('password')
-        profile_pic_base64 = request.form.get('profile_pic')
-
-        if not email or not username or not password or not profile_pic_base64:
+        data = request.get_json()
+        
+        email = data.get('email')
+        username = data.get('username')
+        password = data.get('password')
+        profile_pic_base64 = data.get('profile_pic')  # This is now optional
+        
+        if not email or not username or not password:
             return jsonify({'error': 'Missing required fields'}), 400
-
+        
         try:
             user = users_collection.find_one({'email': email})
         except Exception as e:
             print(f"MongoDB access error: {e}")
             return jsonify({'error': 'Database connection error'}), 500
-
+        
         if user:
             return jsonify({'error': 'User already exists'}), 400
-
+        
         hashed_password = generate_password_hash(password)
-
-        result = users_collection.insert_one({
+        
+        new_user = {
             'username': username,
             'email': email,
             'password': hashed_password,
-            'profile_pic': profile_pic_base64,
             'reset_token': None,
             'reset_token_expiry': None
-        })
-
+        }
+        
+        # Only add profile_pic if it's provided
+        if profile_pic_base64:
+            new_user['profile_pic'] = profile_pic_base64
+        
+        result = users_collection.insert_one(new_user)
+        
         return jsonify({'message': 'User registered successfully', 'user_id': str(result.inserted_id)})
-
+    
     except Exception as e:
         print(f"An error occurred: {e}")
         return jsonify({'error': 'Internal server error'}), 500
@@ -136,7 +140,7 @@ def register():
 @app.route('/login', methods=['POST'])
 def login():
     try:
-        data = request.json if request.is_json else request.form
+        data = request.get_json()
         username = data.get('username')
         password = data.get('password')
 
@@ -156,9 +160,6 @@ def login():
 def forgot_password():
     try:
         data = request.get_json()
-        if not data:
-            return jsonify({'error': 'No JSON data received'}), 400
-
         email = data.get('email')
 
         if not email:
@@ -193,7 +194,7 @@ def forgot_password():
 @app.route('/reset_password', methods=['POST'])
 def reset_password():
     try:
-        data = request.json
+        data = request.get_json()
         reset_token = data.get('token')
         new_password = data.get('new_password')
 
@@ -226,32 +227,41 @@ def reset_password():
 
 @app.route('/update_profile', methods=['PUT'])
 def update_profile():
-    data = request.json
-    user_id = data.get('user_id')
-    username = data.get('username')
-    email = data.get('email')
-    profile_pic = data.get('profile_pic')
+    try:
+        data = request.get_json()
+        user_id = data.get('user_id')
+        username = data.get('username')
+        email = data.get('email')
+        profile_pic = data.get('profile_pic')
 
-    if not user_id:
-        return jsonify({'error': 'User ID is required'}), 400
+        if not user_id:
+            return jsonify({'error': 'User ID is required'}), 400
 
-    users_collection.update_one(
-        {'_id': user_id},
-        {'$set': {'username': username, 'email': email, 'profile_pic': profile_pic}}
-    )
+        users_collection.update_one(
+            {'_id': user_id},
+            {'$set': {'username': username, 'email': email, 'profile_pic': profile_pic}}
+        )
 
-    return jsonify({'message': 'Profile updated successfully'})
+        return jsonify({'message': 'Profile updated successfully'})
+    except Exception as e:
+        print(f"Error in update_profile: {str(e)}")
+        return jsonify({'error': 'An unexpected error occurred'}), 500
 
 @app.route('/delete_account', methods=['DELETE'])
 def delete_account():
-    user_id = request.args.get('user_id')
-    if not user_id:
-        return jsonify({'error': 'User ID is required'}), 400
+    try:
+        data = request.get_json()
+        user_id = data.get('user_id')
+        if not user_id:
+            return jsonify({'error': 'User ID is required'}), 400
 
-    summaries_collection.delete_many({'user_id': user_id})
-    users_collection.delete_one({'_id': user_id})
+        summaries_collection.delete_many({'user_id': user_id})
+        users_collection.delete_one({'_id': user_id})
 
-    return jsonify({'message': 'Account and all associated data deleted successfully'})
+        return jsonify({'message': 'Account and all associated data deleted successfully'})
+    except Exception as e:
+        print(f"Error in delete_account: {str(e)}")
+        return jsonify({'error': 'An unexpected error occurred'}), 500
 
 @app.route('/summarize', methods=['POST'])
 def summarize():
@@ -259,7 +269,8 @@ def summarize():
         return jsonify({'error': 'No document provided'}), 400
     
     document = request.files['document']
-    user_id = request.form.get('user_id')
+    data = request.form.to_dict()
+    user_id = data.get('user_id')
 
     if not document or not user_id:
         return jsonify({'error': 'No document or user_id provided'}), 400
@@ -274,7 +285,7 @@ def summarize():
 
 @app.route('/feedback', methods=['POST'])
 def feedback():
-    data = request.json
+    data = request.get_json()
     summary_id = data.get('summary_id')
     user_id = data.get('user_id')
     feedback_text = data.get('feedback')
@@ -298,8 +309,9 @@ def get_summary():
 
 @app.route('/delete_summary', methods=['DELETE'])
 def remove_summary():
-    summary_id = request.args.get('summary_id')
-    user_id = request.args.get('user_id')
+    data = request.get_json()
+    summary_id = data.get('summary_id')
+    user_id = data.get('user_id')
     if not summary_id or not user_id:
         return jsonify({'error': 'No summary_id or user_id provided'}), 400
 

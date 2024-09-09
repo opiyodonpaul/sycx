@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:sycx_flutter_app/utils/constants.dart';
 import 'package:sycx_flutter_app/utils/secure_storage.dart';
@@ -11,8 +10,7 @@ class ApiClient {
   Future<http.Response> post(
     String endpoint, {
     Map<String, String>? headers,
-    Map<String, dynamic>? body,
-    http.MultipartFile? file,
+    dynamic body,
     bool authRequired = false,
   }) async {
     final uri = Uri.parse('$baseUrl$endpoint');
@@ -21,29 +19,11 @@ class ApiClient {
       defaultHeaders.addAll(headers);
     }
 
-    if (defaultHeaders['Content-Type'] == 'application/json') {
-      final jsonBody = jsonEncode(body);
-      return await httpClient.post(
-        uri,
-        headers: defaultHeaders,
-        body: jsonBody,
-      );
-    } else {
-      final request = http.MultipartRequest('POST', uri);
-      request.headers.addAll(defaultHeaders);
-
-      if (body != null) {
-        request.fields
-            .addAll(body.map((key, value) => MapEntry(key, value.toString())));
-      }
-
-      if (file != null) {
-        request.files.add(file);
-      }
-
-      final streamedResponse = await request.send();
-      return await http.Response.fromStream(streamedResponse);
-    }
+    return await httpClient.post(
+      uri,
+      headers: defaultHeaders,
+      body: body,
+    );
   }
 
   Future<http.Response> get(
@@ -81,7 +61,7 @@ class ApiClient {
     final response = await httpClient.put(
       uri,
       headers: defaultHeaders,
-      body: jsonEncode(body),
+      body: body,
     );
 
     _handleErrors(response);

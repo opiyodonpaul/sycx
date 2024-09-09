@@ -40,7 +40,7 @@ class SplashState extends State<Splash> with SingleTickerProviderStateMixin {
     if (token != null) {
       Navigator.pushReplacementNamed(context, '/home');
     } else {
-      Navigator.pushReplacementNamed(context, '/welcome');
+      Navigator.pushReplacementNamed(context, '/home');
     }
   }
 
@@ -82,8 +82,8 @@ class SplashState extends State<Splash> with SingleTickerProviderStateMixin {
                 ),
                 const SizedBox(height: 20),
                 const CircularProgressIndicator(
-                  valueColor:
-                      AlwaysStoppedAnimation<Color>(AppColors.primaryTextColor),
+                  valueColor: AlwaysStoppedAnimation<Color>(
+                      AppColors.primaryButtonColor),
                 ),
               ],
             ),
