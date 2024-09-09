@@ -87,8 +87,8 @@ class UploadState extends State<Upload> with SingleTickerProviderStateMixin {
         isLoading = false;
       });
 
-      // Navigate to a new screen to display the summaries
-      Navigator.pushNamed(context, '/summary_results', arguments: summaries);
+      // Navigate to a new screen to display the summary
+      Navigator.pushNamed(context, '/summaries', arguments: summaries);
     } catch (e) {
       setState(() {
         isLoading = false;
