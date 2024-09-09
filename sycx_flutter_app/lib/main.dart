@@ -5,6 +5,7 @@ import 'package:sycx_flutter_app/screens/auth/register.dart';
 import 'package:sycx_flutter_app/screens/profile.dart';
 import 'package:sycx_flutter_app/screens/search_results.dart';
 import 'package:sycx_flutter_app/screens/splash.dart';
+import 'package:sycx_flutter_app/screens/summaries.dart';
 import 'package:sycx_flutter_app/screens/summary_details.dart';
 import 'package:sycx_flutter_app/screens/upload.dart';
 import 'package:sycx_flutter_app/screens/view_summary.dart';
@@ -42,7 +43,7 @@ class MyApp extends StatelessWidget {
               summary: {},
             ),
         '/upload': (context) => const Upload(),
-        '/summaries': (context) => const Upload(),
+        '/summaries': (context) => const Summaries(),
         '/profile': (context) => const Profile(),
       },
     );
