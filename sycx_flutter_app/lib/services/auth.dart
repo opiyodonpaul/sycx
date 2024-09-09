@@ -9,7 +9,7 @@ class Auth {
   static Future<bool> login(String username, String password) async {
     final response = await _apiClient.post(
       '/login',
-      body: {'username': username, 'password': password},
+      body: jsonEncode({'username': username, 'password': password}),
       headers: {'Content-Type': 'application/json'},
     );
 
@@ -25,12 +25,13 @@ class Auth {
       String username, String email, String password, String profilePic) async {
     final response = await _apiClient.post(
       '/register',
-      body: {
+      body: jsonEncode({
         'username': username,
         'email': email,
         'password': password,
         'profile_pic': profilePic
-      },
+      }),
+      headers: {'Content-Type': 'application/json'},
     );
 
     if (response.statusCode == 200) {
@@ -44,9 +45,9 @@ class Auth {
   static Future<bool> resetPassword(String email) async {
     final response = await _apiClient.post(
       '/forgot_password',
-      body: {'email': email},
+      body: jsonEncode({'email': email}),
+      headers: {'Content-Type': 'application/json'},
     );
-
     return response.statusCode == 200;
   }
 

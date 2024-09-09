@@ -47,4 +47,32 @@ class DummyData {
     'Genetic Engineering',
     'Cybersecurity',
   ];
+
+  // New dummy data for uploaded files
+  static final uploadedFiles = [
+    {
+      'name': 'Research Paper.pdf',
+      'size': '2.5 MB',
+      'type': 'PDF',
+      'icon': 'assets/icons/pdf_icon.png',
+    },
+    {
+      'name': 'Presentation Slides.pptx',
+      'size': '5.1 MB',
+      'type': 'PPTX',
+      'icon': 'assets/icons/ppt_icon.png',
+    },
+    {
+      'name': 'Data Analysis.xlsx',
+      'size': '1.8 MB',
+      'type': 'XLSX',
+      'icon': 'assets/icons/excel_icon.png',
+    },
+    {
+      'name': 'Project Report.docx',
+      'size': '3.2 MB',
+      'type': 'DOCX',
+      'icon': 'assets/icons/word_icon.png',
+    },
+  ];
 }

@@ -19,7 +19,6 @@ class SummaryService {
       body: {
         'user_id': userId,
       },
-      file: file,
       authRequired: true,
     );
 
