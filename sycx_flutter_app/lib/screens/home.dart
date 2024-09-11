@@ -38,6 +38,7 @@ class HomeState extends State<Home> with SingleTickerProviderStateMixin {
       duration: const Duration(milliseconds: 1000),
     );
     _loadData();
+    CustomBottomNavBar.updateLastMainRoute('/home');
   }
 
   Future<void> _loadData() async {
@@ -371,6 +372,7 @@ class HomeState extends State<Home> with SingleTickerProviderStateMixin {
   }
 
   Future<void> _handleRefresh() async {
+    CustomBottomNavBar.updateLastMainRoute('/home');
     await Future.delayed(const Duration(seconds: 2));
   }
 }

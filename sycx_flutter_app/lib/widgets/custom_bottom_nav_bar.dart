@@ -39,25 +39,25 @@ class CustomBottomNavBar extends StatelessWidget {
           showUnselectedLabels: false,
           type: BottomNavigationBarType.fixed,
           items: [
-            _buildNavItem(Icons.home, 'Home', '/home'),
-            _buildNavItem(Icons.upload, 'Upload', '/upload'),
-            _buildNavItem(
+            buildNavItem(Icons.home, 'Home', '/home'),
+            buildNavItem(Icons.upload, 'Upload', '/upload'),
+            buildNavItem(
                 Icons.my_library_books_rounded, 'Summaries', '/summaries'),
           ],
           onTap: (index) {
             String route = ['/home', '/upload', '/summaries'][index];
-            String currentParentRoute = _getParentRoute(currentRoute);
-            if (currentParentRoute != route || currentRoute != route) {
+            String currentParentRoute = getParentRoute(currentRoute);
+            if (currentParentRoute != route) {
               Navigator.pushReplacementNamed(context, route);
             }
           },
-          currentIndex: _getCurrentIndex(),
+          currentIndex: getCurrentIndex(),
         ),
       ),
     );
   }
 
-  BottomNavigationBarItem _buildNavItem(
+  BottomNavigationBarItem buildNavItem(
     IconData icon,
     String label,
     String route,
@@ -67,7 +67,7 @@ class CustomBottomNavBar extends StatelessWidget {
         padding: const EdgeInsets.all(6),
         decoration: BoxDecoration(
           shape: BoxShape.circle,
-          color: _getParentRoute(currentRoute) == route
+          color: getParentRoute(currentRoute) == route
               ? Colors.white.withOpacity(0.2)
               : Colors.transparent,
         ),
@@ -80,26 +80,30 @@ class CustomBottomNavBar extends StatelessWidget {
     );
   }
 
-  String _getParentRoute(String route) {
-    if (['/home', '/profile', '/search', '/summary_details', '/view_summary']
-        .contains(route)) {
-      return '/home';
-    } else if (['/upload', '/profile'].contains(route)) {
-      return '/upload';
-    } else if ([
-      '/summaries',
+  String getParentRoute(String route) {
+    final sharedRoutes = [
       '/profile',
       '/search',
       '/summary_details',
       '/view_summary'
-    ].contains(route)) {
+    ];
+
+    if (route == '/home' ||
+        (sharedRoutes.contains(route) && _lastMainRoute == '/home')) {
+      return '/home';
+    } else if (route == '/upload' ||
+        (sharedRoutes.contains(route) && _lastMainRoute == '/upload')) {
+      return '/upload';
+    } else if (route == '/summaries' ||
+        (sharedRoutes.contains(route) && _lastMainRoute == '/summaries')) {
       return '/summaries';
     }
+
     return route;
   }
 
-  int _getCurrentIndex() {
-    String parentRoute = _getParentRoute(currentRoute);
+  int getCurrentIndex() {
+    String parentRoute = getParentRoute(currentRoute);
     switch (parentRoute) {
       case '/home':
         return 0;
@@ -109,6 +113,16 @@ class CustomBottomNavBar extends StatelessWidget {
         return 2;
       default:
         return 0;
+    }
+  }
+
+  // Add this variable to keep track of the last main route
+  static String _lastMainRoute = '/home';
+
+  // Add this method to update the last main route
+  static void updateLastMainRoute(String route) {
+    if (['/home', '/upload', '/summaries'].contains(route)) {
+      _lastMainRoute = route;
     }
   }
 }

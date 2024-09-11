@@ -35,6 +35,7 @@ class UploadState extends State<Upload> with SingleTickerProviderStateMixin {
       duration: const Duration(milliseconds: 1000),
     );
     _animationController.forward();
+    CustomBottomNavBar.updateLastMainRoute('/upload');
   }
 
   @override
@@ -622,6 +623,7 @@ class UploadState extends State<Upload> with SingleTickerProviderStateMixin {
 
   Future<void> _handleRefresh() async {
     setState(() {
+      CustomBottomNavBar.updateLastMainRoute('/upload');
       uploadedFiles.clear();
       summaryDepth = 0;
     });

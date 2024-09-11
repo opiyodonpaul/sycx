@@ -38,6 +38,7 @@ class SummariesState extends State<Summaries>
       duration: const Duration(milliseconds: 1000),
     );
     _loadData();
+    CustomBottomNavBar.updateLastMainRoute('/summaries');
   }
 
   Future<void> _loadData() async {
@@ -306,6 +307,7 @@ class SummariesState extends State<Summaries>
   }
 
   Future<void> _handleRefresh() async {
+    CustomBottomNavBar.updateLastMainRoute('/summaries');
     await Future.delayed(const Duration(seconds: 2));
   }
 }
