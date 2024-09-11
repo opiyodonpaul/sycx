@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:sycx_flutter_app/utils/constants.dart';
 import 'package:sycx_flutter_app/widgets/custom_app_bar_mini.dart';
+import 'package:sycx_flutter_app/widgets/custom_bottom_nav_bar.dart';
 import 'package:sycx_flutter_app/widgets/custom_textfield.dart';
 import 'package:sycx_flutter_app/widgets/animated_button.dart';
 import 'package:sycx_flutter_app/utils/pick_image.dart';
@@ -66,61 +67,63 @@ class EditProfileState extends State<EditProfile> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: const CustomAppBarMini(title: 'Edit Profile'),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          child: Padding(
-            padding: const EdgeInsets.all(24.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                const SizedBox(height: 40),
-                _buildProfileImage(),
-                const SizedBox(height: 24),
-                AnimatedButton(
-                  text: 'Change Profile Picture',
-                  onPressed: _selectProfilePicture,
-                  backgroundColor: AppColors.secondaryButtonColor,
-                  textColor: AppColors.secondaryButtonTextColor,
-                ),
-                const SizedBox(height: 24),
-                CustomTextField(
-                  controller: _nameController,
-                  focusNode: _nameFocus,
-                  hintText: 'Name',
-                  onChanged: (value) {},
-                  validator: (value) =>
-                      value!.isEmpty ? 'Name cannot be empty' : null,
-                  prefixIcon: Icons.person,
-                  onFieldSubmitted: (_) {
-                    FocusScope.of(context).requestFocus(_emailFocus);
-                  },
-                ),
-                const SizedBox(height: 16),
-                CustomTextField(
-                  controller: _emailController,
-                  focusNode: _emailFocus,
-                  hintText: 'Email',
-                  onChanged: (value) {},
-                  validator: (value) =>
-                      value!.isEmpty ? 'Email cannot be empty' : null,
-                  prefixIcon: Icons.email,
-                  onFieldSubmitted: (_) => _submitForm(),
-                ),
-                const SizedBox(height: 32),
-                AnimatedButton(
-                  text: 'Save Changes',
-                  onPressed: _submitForm,
-                  backgroundColor: AppColors.primaryButtonColor,
-                  textColor: AppColors.primaryButtonTextColor,
-                ),
-              ],
+        appBar: const CustomAppBarMini(title: 'Edit Profile'),
+        body: SafeArea(
+          child: SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            child: Padding(
+              padding: const EdgeInsets.all(24.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  const SizedBox(height: 40),
+                  _buildProfileImage(),
+                  const SizedBox(height: 24),
+                  AnimatedButton(
+                    text: 'Change Profile Picture',
+                    onPressed: _selectProfilePicture,
+                    backgroundColor: AppColors.secondaryButtonColor,
+                    textColor: AppColors.secondaryButtonTextColor,
+                  ),
+                  const SizedBox(height: 24),
+                  CustomTextField(
+                    controller: _nameController,
+                    focusNode: _nameFocus,
+                    hintText: 'Name',
+                    onChanged: (value) {},
+                    validator: (value) =>
+                        value!.isEmpty ? 'Name cannot be empty' : null,
+                    prefixIcon: Icons.person,
+                    onFieldSubmitted: (_) {
+                      FocusScope.of(context).requestFocus(_emailFocus);
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                  CustomTextField(
+                    controller: _emailController,
+                    focusNode: _emailFocus,
+                    hintText: 'Email',
+                    onChanged: (value) {},
+                    validator: (value) =>
+                        value!.isEmpty ? 'Email cannot be empty' : null,
+                    prefixIcon: Icons.email,
+                    onFieldSubmitted: (_) => _submitForm(),
+                  ),
+                  const SizedBox(height: 32),
+                  AnimatedButton(
+                    text: 'Save Changes',
+                    onPressed: _submitForm,
+                    backgroundColor: AppColors.primaryButtonColor,
+                    textColor: AppColors.primaryButtonTextColor,
+                  ),
+                ],
+              ),
             ),
           ),
         ),
-      ),
-    );
+        bottomNavigationBar: const CustomBottomNavBar(
+          currentRoute: '/edit_profile',
+        ));
   }
 
   Widget _buildProfileImage() {
