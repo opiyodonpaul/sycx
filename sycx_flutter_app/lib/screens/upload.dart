@@ -165,7 +165,13 @@ class UploadState extends State<Upload> with SingleTickerProviderStateMixin {
               showBackground: false,
               title: 'SycX',
             ),
-            body: isLoading ? const Loading() : _buildBody(),
+            body: RefreshIndicator(
+              onRefresh: _handleRefresh,
+              child: SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                child: _buildBody(),
+              ),
+            ),
             bottomNavigationBar: const CustomBottomNavBar(
               currentRoute: '/upload',
             ),
@@ -173,39 +179,29 @@ class UploadState extends State<Upload> with SingleTickerProviderStateMixin {
   }
 
   Widget _buildBody() {
-    return RefreshIndicator(
-      onRefresh: () async {
-        setState(() {
-          uploadedFiles.clear();
-          summaryDepth = 0;
-        });
-      },
-      child: SingleChildScrollView(
-        physics: const AlwaysScrollableScrollPhysics(),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildWelcomeSection(),
-            Padding(
-              padding: const EdgeInsets.all(defaultPadding),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  _buildInstructions(),
-                  const SizedBox(height: defaultMargin),
-                  _buildUploadArea(),
-                  const SizedBox(height: defaultMargin),
-                  _buildPreviewContent(),
-                  const SizedBox(height: defaultMargin),
-                  _buildSummarizationPreferences(),
-                  const SizedBox(height: defaultMargin),
-                  _buildSummarizeButton(),
-                ],
-              ),
-            ),
-          ],
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildWelcomeSection(),
+        Padding(
+          padding: const EdgeInsets.all(defaultPadding),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _buildInstructions(),
+              const SizedBox(height: defaultMargin),
+              _buildUploadArea(),
+              const SizedBox(height: defaultMargin),
+              _buildPreviewContent(),
+              const SizedBox(height: defaultMargin),
+              _buildSummarizationPreferences(),
+              const SizedBox(height: defaultMargin),
+              _buildSummarizeButton(),
+            ],
+          ),
         ),
-      ),
+        const SizedBox(height: 8),
+      ],
     );
   }
 
@@ -296,9 +292,8 @@ class UploadState extends State<Upload> with SingleTickerProviderStateMixin {
               ),
               const SizedBox(height: 8),
               _buildInstructionStep('1. Upload your files'),
-              _buildInstructionStep('2. Preview and confirm'),
-              _buildInstructionStep('3. Set summary depth'),
-              _buildInstructionStep('4. Click Summarize'),
+              _buildInstructionStep('2. Set summary depth'),
+              _buildInstructionStep('3. Click Summarize'),
             ],
           ),
         ),
@@ -623,5 +618,12 @@ class UploadState extends State<Upload> with SingleTickerProviderStateMixin {
       default:
         return Icons.insert_drive_file;
     }
+  }
+
+  Future<void> _handleRefresh() async {
+    setState(() {
+      uploadedFiles.clear();
+      summaryDepth = 0;
+    });
   }
 }
