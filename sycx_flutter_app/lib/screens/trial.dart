@@ -67,18 +67,18 @@ class ProfileState extends State<Profile> {
     return _loading
         ? const Loading()
         : Scaffold(
-            appBar: const CustomAppBarMini(title: 'Profile'),
-            body: RefreshIndicator(
-              onRefresh: _handleRefresh,
-              child: SingleChildScrollView(
-                physics: const AlwaysScrollableScrollPhysics(),
-                child: _buildBody(),
-              ),
-            ),
-            bottomNavigationBar: const CustomBottomNavBar(
-              currentRoute: '/profile',
-            ),
-          );
+      appBar: const CustomAppBarMini(title: 'Profile'),
+      body: RefreshIndicator(
+        onRefresh: _handleRefresh,
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          child: _buildBody(),
+        ),
+      ),
+      bottomNavigationBar: const CustomBottomNavBar(
+        currentRoute: '/profile',
+      ),
+    );
   }
 
   Widget _buildBody() {

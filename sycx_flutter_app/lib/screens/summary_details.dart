@@ -26,118 +26,126 @@ class SummaryDetailsState extends State<SummaryDetails> {
 
   @override
   Widget build(BuildContext context) {
-    return Stack(
-      children: [
-        Scaffold(
-          appBar: CustomAppBarMini(
-              title: widget.summary['title'] ?? 'Summary Details'),
-          body: RefreshIndicator(
-            onRefresh: _handleRefresh,
-            child: SingleChildScrollView(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildCardImage(widget.summary['image'] as String? ?? ''),
-                  Padding(
-                    padding: const EdgeInsets.all(16.0),
+    return _isLoading
+        ? const Loading()
+        : Stack(
+            children: [
+              Scaffold(
+                appBar: CustomAppBarMini(
+                    title: widget.summary['title'] ?? 'Summary Details'),
+                body: RefreshIndicator(
+                  onRefresh: _handleRefresh,
+                  child: SingleChildScrollView(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          widget.summary['title'] ?? 'Untitled Summary',
-                          style: AppTextStyles.headingStyleNoShadow
-                              .copyWith(color: AppColors.primaryTextColorDark),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'Created on ${DateFormat('MMM d, yyyy').format(DateTime.parse(widget.summary['date'] as String? ?? DateTime.now().toIso8601String()))}',
-                          style: AppTextStyles.bodyTextStyle
-                              .copyWith(color: AppColors.altPriTextColorDark),
-                        ),
-                        const SizedBox(height: 24),
-                        Text(
-                          'Actions',
-                          style: AppTextStyles.titleStyle,
-                        ),
-                        const SizedBox(height: 16),
-                        OpenContainer(
-                          transitionDuration: const Duration(milliseconds: 500),
-                          openBuilder: (context, _) =>
-                              ViewSummary(summary: widget.summary),
-                          closedBuilder: (context, openContainer) =>
-                              AnimatedButton(
-                            text: 'View Summary',
-                            onPressed: openContainer,
-                            backgroundColor: AppColors.gradientStart,
-                            textColor: AppColors.primaryButtonTextColor,
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        AnimatedButton(
-                          text: 'Download Summary',
-                          onPressed: () => _downloadSummary(context),
-                          backgroundColor: AppColors.gradientMiddle,
-                          textColor: AppColors.primaryButtonTextColor,
-                        ),
-                        const SizedBox(height: 12),
-                        AnimatedButton(
-                          text: 'Delete Summary',
-                          onPressed: () => _deleteSummary(context),
-                          backgroundColor: AppColors.gradientEnd,
-                          textColor: AppColors.primaryButtonTextColor,
-                        ),
-                        const SizedBox(height: 24),
-                        Text(
-                          'Rate this Summary',
-                          style: AppTextStyles.titleStyle,
-                        ),
-                        const SizedBox(height: 8),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            for (int i = 1; i <= 5; i++)
-                              GestureDetector(
-                                onTap: () {
-                                  setState(() {
-                                    _rating = i.toDouble();
-                                  });
-                                },
-                                child: Icon(
-                                  i <= _rating ? Icons.star : Icons.star_border,
-                                  color: Colors.amber,
-                                  size: 40,
+                        _buildCardImage(
+                            widget.summary['image'] as String? ?? ''),
+                        Padding(
+                          padding: const EdgeInsets.all(16.0),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                widget.summary['title'] ?? 'Untitled Summary',
+                                style: AppTextStyles.headingStyleNoShadow
+                                    .copyWith(
+                                        color: AppColors.primaryTextColorDark),
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                'Created on ${DateFormat('MMM d, yyyy').format(DateTime.parse(widget.summary['date'] as String? ?? DateTime.now().toIso8601String()))}',
+                                style: AppTextStyles.bodyTextStyle.copyWith(
+                                    color: AppColors.altPriTextColorDark),
+                              ),
+                              const SizedBox(height: 24),
+                              Text(
+                                'Actions',
+                                style: AppTextStyles.titleStyle,
+                              ),
+                              const SizedBox(height: 16),
+                              OpenContainer(
+                                transitionDuration:
+                                    const Duration(milliseconds: 500),
+                                openBuilder: (context, _) =>
+                                    ViewSummary(summary: widget.summary),
+                                closedBuilder: (context, openContainer) =>
+                                    AnimatedButton(
+                                  text: 'View Summary',
+                                  onPressed: openContainer,
+                                  backgroundColor: AppColors.gradientStart,
+                                  textColor: AppColors.primaryButtonTextColor,
                                 ),
                               ),
-                          ],
-                        ),
-                        const SizedBox(height: 16),
-                        CustomTextArea(
-                          controller: _reviewController,
-                          hintText:
-                              'Share your feedback on this summary and suggest improvements for future summaries.',
-                          maxLines: 5,
-                        ),
-                        const SizedBox(height: 16),
-                        AnimatedButton(
-                          text: 'Submit Review',
-                          onPressed: _submitReview,
-                          backgroundColor: AppColors.primaryButtonColor,
-                          textColor: AppColors.primaryButtonTextColor,
+                              const SizedBox(height: 12),
+                              AnimatedButton(
+                                text: 'Download Summary',
+                                onPressed: () => _downloadSummary(context),
+                                backgroundColor: AppColors.gradientMiddle,
+                                textColor: AppColors.primaryButtonTextColor,
+                              ),
+                              const SizedBox(height: 12),
+                              AnimatedButton(
+                                text: 'Delete Summary',
+                                onPressed: () => _deleteSummary(context),
+                                backgroundColor: AppColors.gradientEnd,
+                                textColor: AppColors.primaryButtonTextColor,
+                              ),
+                              const SizedBox(height: 24),
+                              Text(
+                                'Rate this Summary',
+                                style: AppTextStyles.titleStyle,
+                              ),
+                              const SizedBox(height: 8),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  for (int i = 1; i <= 5; i++)
+                                    GestureDetector(
+                                      onTap: () {
+                                        setState(() {
+                                          _rating = i.toDouble();
+                                        });
+                                      },
+                                      child: Icon(
+                                        i <= _rating
+                                            ? Icons.star
+                                            : Icons.star_border,
+                                        color: Colors.amber,
+                                        size: 40,
+                                      ),
+                                    ),
+                                ],
+                              ),
+                              const SizedBox(height: 16),
+                              CustomTextArea(
+                                controller: _reviewController,
+                                hintText:
+                                    'Share your feedback on this summary and suggest improvements for future summaries.',
+                                maxLines: 5,
+                              ),
+                              const SizedBox(height: 16),
+                              AnimatedButton(
+                                text: 'Submit Review',
+                                onPressed: _submitReview,
+                                backgroundColor: AppColors.primaryButtonColor,
+                                textColor: AppColors.primaryButtonTextColor,
+                              ),
+                              const SizedBox(height: 5),
+                            ],
+                          ),
                         ),
                       ],
                     ),
                   ),
-                ],
+                ),
+                bottomNavigationBar: const CustomBottomNavBar(
+                  currentRoute: '/summary_details',
+                ),
               ),
-            ),
-          ),
-          bottomNavigationBar: const CustomBottomNavBar(
-            currentRoute: '/summary_details',
-          ),
-        ),
-        if (_isLoading) const Loading(),
-      ],
-    );
+              if (_isLoading) const Loading(),
+            ],
+          );
   }
 
   Widget _buildCardImage(String imageUrl) {

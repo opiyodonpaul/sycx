@@ -62,6 +62,7 @@ class SearchResultsState extends State<SearchResults> {
                           ),
                           const SizedBox(height: 16),
                           _buildSearchResults(),
+                          const SizedBox(height: 5),
                         ],
                       ),
                     ),
