@@ -6,8 +6,6 @@ import 'package:sycx_flutter_app/widgets/custom_bottom_nav_bar.dart';
 import 'package:sycx_flutter_app/widgets/loading.dart';
 import 'package:sycx_flutter_app/screens/edit_profile.dart';
 import 'package:sycx_flutter_app/screens/account_settings.dart';
-import 'package:sycx_flutter_app/screens/privacy_security.dart';
-import 'package:sycx_flutter_app/screens/notifications_settings.dart';
 import 'package:sycx_flutter_app/screens/data_access.dart';
 import 'package:sycx_flutter_app/screens/help_center.dart';
 
@@ -73,15 +71,33 @@ class ProfileState extends State<Profile> with SingleTickerProviderStateMixin {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildProfileHeader(),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16.0, 16.0, 16.0, 0.0),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                flex: 2,
+                child: _buildProfileHeader(),
+              ),
+              const SizedBox(width: 5),
+              Expanded(
+                flex: 3,
+                child: _buildInfoCard(),
+              ),
+            ],
+          ),
+        ),
         _buildSettings(),
       ],
     );
   }
 
   Widget _buildProfileHeader() {
-    return Center(
-      child: Container(
+    return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
           children: [
@@ -94,27 +110,30 @@ class ProfileState extends State<Profile> with SingleTickerProviderStateMixin {
                 ),
               ),
               child: Padding(
-                padding: const EdgeInsets.all(6),
+                padding: const EdgeInsets.all(4),
                 child: CircleAvatar(
-                  radius: 80,
+                  radius: 50,
                   backgroundImage: NetworkImage(userData['avatar']),
                 ),
               ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 12),
             Text(
               userData['name'],
-              style: AppTextStyles.headingStyleNoShadow.copyWith(
+              style: AppTextStyles.titleStyle.copyWith(
                 color: AppColors.primaryTextColorDark,
+                fontWeight: FontWeight.bold,
+                fontSize: 18,
               ),
             ),
             Text(
               '@${userData['name'].toLowerCase()}',
-              style: AppTextStyles.subheadingStyle.copyWith(
+              style: AppTextStyles.bodyTextStyle.copyWith(
                 color: AppColors.secondaryTextColorDark,
+                fontSize: 14,
               ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 12),
             ElevatedButton(
               onPressed: () async {
                 final result = await Navigator.push(
@@ -131,11 +150,73 @@ class ProfileState extends State<Profile> with SingleTickerProviderStateMixin {
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primaryButtonColor,
                 foregroundColor: AppColors.primaryButtonTextColor,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(80),
+                ),
               ),
               child: const Text('Edit Profile'),
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildInfoCard() {
+    return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 10.0, horizontal: 6.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Profile Overview',
+                style: AppTextStyles.titleStyle
+                    .copyWith(color: AppColors.primaryTextColorDark)),
+            const SizedBox(height: 8), // Reduced spacing
+            Text(
+              'Manage your account and settings.',
+              style: AppTextStyles.bodyTextStyle
+                  .copyWith(color: AppColors.secondaryTextColorDark),
+            ),
+            const SizedBox(height: 10),
+            for (var item in [
+              'Edit profile',
+              'Manage settings',
+              'Control data',
+              'Support'
+            ]) // Condensed item labels
+              _buildInfoItem(item),
+            const SizedBox(height: 10),
+            Text(
+              'Need help? Go to Help Center.',
+              style: AppTextStyles.bodyTextStyle.copyWith(
+                color: AppColors.altPriTextColorDark,
+                fontStyle: FontStyle.italic,
+                fontSize: 12,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildInfoItem(String text) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: defaultPadding / 2),
+      child: Row(
+        children: [
+          const Icon(Icons.check_circle,
+              size: 16, color: AppColors.primaryButtonColor),
+          const SizedBox(width: defaultPadding / 2),
+          Expanded(
+            child: Text(text,
+                style: AppTextStyles.bodyTextStyle
+                    .copyWith(color: AppColors.secondaryTextColorDark)),
+          ),
+        ],
       ),
     );
   }
@@ -150,55 +231,102 @@ class ProfileState extends State<Profile> with SingleTickerProviderStateMixin {
             'Settings',
             style: AppTextStyles.titleStyle.copyWith(
               color: AppColors.primaryTextColorDark,
+              fontWeight: FontWeight.bold,
             ),
           ),
         ),
-        _buildSettingItem('Account settings', Icons.person, () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => const AccountSettings()),
-          );
-        }),
-        _buildSettingItem('Privacy & security', Icons.security, () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => const PrivacySecurity()),
-          );
-        }),
-        _buildSettingItem('Notifications', Icons.notifications, () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-                builder: (context) => const NotificationsSettings()),
-          );
-        }),
-        _buildSettingItem('Access to data', Icons.data_usage, () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => const DataAccess()),
-          );
-        }),
-        _buildSettingItem('Help Center', Icons.help, () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => const HelpCenter()),
-          );
-        }),
+        _buildSettingItem(
+          'Account Settings',
+          'Manage your account details and preferences',
+          Icons.person,
+          () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => const AccountSettings()),
+            );
+          },
+        ),
+        _buildSettingItem(
+          'Access to Data',
+          'View and manage your personal data',
+          Icons.data_usage,
+          () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => const DataAccess()),
+            );
+          },
+        ),
+        _buildSettingItem(
+          'Help Center',
+          'Get support and answers to your questions',
+          Icons.help,
+          () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => const HelpCenter()),
+            );
+          },
+        ),
       ],
     );
   }
 
-  Widget _buildSettingItem(String title, IconData icon, VoidCallback onTap) {
-    return ListTile(
-      leading: Icon(icon, color: AppColors.primaryTextColorDark),
-      title: Text(
-        title,
-        style: AppTextStyles.bodyTextStyle.copyWith(
-          color: AppColors.primaryTextColorDark,
+  Widget _buildSettingItem(
+      String title, String description, IconData icon, VoidCallback onTap) {
+    return Card(
+      elevation: 0,
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppColors.primaryTextColorDark.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child:
+                    Icon(icon, color: AppColors.primaryTextColorDark, size: 28),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: AppTextStyles.titleStyle.copyWith(
+                        color: AppColors.primaryTextColorDark,
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      description,
+                      style: AppTextStyles.bodyTextStyle.copyWith(
+                        color: AppColors.secondaryTextColorDark,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.all(6),
+                child: const Icon(Icons.arrow_forward_ios,
+                    size: 20, color: AppColors.primaryTextColorDark),
+              ),
+            ],
+          ),
         ),
       ),
-      trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-      onTap: onTap,
     );
   }
 
