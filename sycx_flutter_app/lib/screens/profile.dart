@@ -1,13 +1,15 @@
 import 'package:flutter/material.dart';
-import 'package:sycx_flutter_app/services/profile.dart';
+import 'package:sycx_flutter_app/dummy_data.dart';
 import 'package:sycx_flutter_app/utils/constants.dart';
-import 'package:sycx_flutter_app/utils/pick_image.dart';
-import 'package:sycx_flutter_app/utils/convert_to_base64.dart';
-import 'package:sycx_flutter_app/widgets/animated_button.dart';
 import 'package:sycx_flutter_app/widgets/custom_app_bar_mini.dart';
 import 'package:sycx_flutter_app/widgets/custom_bottom_nav_bar.dart';
-import 'package:sycx_flutter_app/widgets/custom_textfield.dart';
 import 'package:sycx_flutter_app/widgets/loading.dart';
+import 'package:sycx_flutter_app/screens/edit_profile.dart';
+import 'package:sycx_flutter_app/screens/account_settings.dart';
+import 'package:sycx_flutter_app/screens/privacy_security.dart';
+import 'package:sycx_flutter_app/screens/notifications_settings.dart';
+import 'package:sycx_flutter_app/screens/data_access.dart';
+import 'package:sycx_flutter_app/screens/help_center.dart';
 
 class Profile extends StatefulWidget {
   const Profile({super.key});
@@ -16,49 +18,35 @@ class Profile extends StatefulWidget {
   ProfileState createState() => ProfileState();
 }
 
-class ProfileState extends State<Profile> {
-  final _usernameController = TextEditingController();
-  final _emailController = TextEditingController();
-  String _profilePic = '';
+class ProfileState extends State<Profile> with SingleTickerProviderStateMixin {
   bool _loading = false;
+  late AnimationController _animationController;
+  Map<String, dynamic> userData = DummyData.user;
 
-  void _updateProfile() async {
+  @override
+  void initState() {
+    super.initState();
+    _animationController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1000),
+    );
+    _loadData();
+  }
+
+  Future<void> _loadData() async {
     setState(() {
       _loading = true;
     });
-
-    try {
-      bool success = await ProfileService.updateProfile(
-        'user_id', // Pass user id here
-        _usernameController.text,
-        _emailController.text,
-        _profilePic,
-      );
-
-      if (success) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text('Profile updated successfully'),
-        ));
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text('Profile update failed'),
-        ));
-      }
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text('Error: ${e.toString()}'),
-      ));
-    } finally {
-      setState(() {
-        _loading = false;
-      });
-    }
+    await Future.delayed(const Duration(seconds: 2));
+    setState(() {
+      _loading = false;
+    });
+    _animationController.forward();
   }
 
   @override
   void dispose() {
-    _usernameController.dispose();
-    _emailController.dispose();
+    _animationController.dispose();
     super.dispose();
   }
 
@@ -82,39 +70,69 @@ class ProfileState extends State<Profile> {
   }
 
   Widget _buildBody() {
-    return Padding(
-      padding: const EdgeInsets.all(16.0),
-      child: Form(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildProfileHeader(),
+        _buildSettings(),
+      ],
+    );
+  }
+
+  Widget _buildProfileHeader() {
+    return Center(
+      child: Container(
+        padding: const EdgeInsets.all(16.0),
         child: Column(
           children: [
-            CustomTextField(
-              hintText: 'Username',
-              onChanged: (value) => {},
-              validator: (value) => value!.isEmpty ? 'Enter a username' : null,
-              controller: _usernameController,
+            Container(
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: AppColors.primaryButtonColor,
+                  width: 3,
+                ),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(6),
+                child: CircleAvatar(
+                  radius: 80,
+                  backgroundImage: NetworkImage(userData['avatar']),
+                ),
+              ),
             ),
-            CustomTextField(
-              hintText: 'Email',
-              onChanged: (value) => {},
-              validator: (value) => value!.isEmpty ? 'Enter an email' : null,
-              controller: _emailController,
+            const SizedBox(height: 16),
+            Text(
+              userData['name'],
+              style: AppTextStyles.headingStyleNoShadow.copyWith(
+                color: AppColors.primaryTextColorDark,
+              ),
             ),
-            TextButton(
+            Text(
+              '@${userData['name'].toLowerCase()}',
+              style: AppTextStyles.subheadingStyle.copyWith(
+                color: AppColors.secondaryTextColorDark,
+              ),
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton(
               onPressed: () async {
-                final picker = PickImage();
-                final file = await picker.pickImageFromGallery();
-                if (file != null) {
-                  _profilePic = await convertFileToBase64(file);
+                final result = await Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                      builder: (context) => EditProfile(userData: userData)),
+                );
+                if (result != null) {
+                  setState(() {
+                    userData = result;
+                  });
                 }
               },
-              child: const Text('Change Profile Picture'),
-            ),
-            const SizedBox(height: 20),
-            AnimatedButton(
-              text: 'Update Profile',
-              onPressed: _updateProfile,
-              backgroundColor: AppColors.secondaryButtonColor,
-              textColor: AppColors.secondaryButtonTextColor,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primaryButtonColor,
+                foregroundColor: AppColors.primaryButtonTextColor,
+              ),
+              child: const Text('Edit Profile'),
             ),
           ],
         ),
@@ -122,7 +140,69 @@ class ProfileState extends State<Profile> {
     );
   }
 
+  Widget _buildSettings() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Text(
+            'Settings',
+            style: AppTextStyles.titleStyle.copyWith(
+              color: AppColors.primaryTextColorDark,
+            ),
+          ),
+        ),
+        _buildSettingItem('Account settings', Icons.person, () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const AccountSettings()),
+          );
+        }),
+        _buildSettingItem('Privacy & security', Icons.security, () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const PrivacySecurity()),
+          );
+        }),
+        _buildSettingItem('Notifications', Icons.notifications, () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+                builder: (context) => const NotificationsSettings()),
+          );
+        }),
+        _buildSettingItem('Access to data', Icons.data_usage, () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const DataAccess()),
+          );
+        }),
+        _buildSettingItem('Help Center', Icons.help, () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const HelpCenter()),
+          );
+        }),
+      ],
+    );
+  }
+
+  Widget _buildSettingItem(String title, IconData icon, VoidCallback onTap) {
+    return ListTile(
+      leading: Icon(icon, color: AppColors.primaryTextColorDark),
+      title: Text(
+        title,
+        style: AppTextStyles.bodyTextStyle.copyWith(
+          color: AppColors.primaryTextColorDark,
+        ),
+      ),
+      trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+      onTap: onTap,
+    );
+  }
+
   Future<void> _handleRefresh() async {
-    await Future.delayed(const Duration(seconds: 2));
+    await _loadData();
   }
 }
