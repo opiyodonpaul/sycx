@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:fluttertoast/fluttertoast.dart';
 import 'package:sycx_flutter_app/utils/constants.dart';
 import 'package:sycx_flutter_app/widgets/custom_app_bar_mini.dart';
 import 'package:sycx_flutter_app/widgets/custom_bottom_nav_bar.dart';
@@ -253,7 +254,7 @@ class _ViewSummaryState extends State<ViewSummary> {
     return Column(
       children: [
         GestureDetector(
-          onTap: () => _launchURL(url),
+          onTap: () => _launchURL(context, url),
           child: Text(
             text,
             style: AppTextStyles.bodyTextStyle.copyWith(
@@ -267,13 +268,33 @@ class _ViewSummaryState extends State<ViewSummary> {
     );
   }
 
-  void _launchURL(String url) async {
+  void _launchURL(BuildContext context, String url) async {
     final Uri uri = Uri.parse(url);
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri);
-    } else {
-      throw 'Could not launch $url';
+    try {
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      } else {
+        // If can't launch directly, try opening in browser
+        final fallbackUrl = Uri.parse('https://${uri.host}${uri.path}');
+        if (await canLaunchUrl(fallbackUrl)) {
+          await launchUrl(fallbackUrl, mode: LaunchMode.externalApplication);
+        } else {
+          _showToast('Could not launch $url');
+        }
+      }
+    } catch (e) {
+      _showToast('Error: ${e.toString()}');
     }
+  }
+
+  void _showToast(String message) {
+    Fluttertoast.showToast(
+      msg: message,
+      toastLength: Toast.LENGTH_SHORT,
+      gravity: ToastGravity.BOTTOM,
+      backgroundColor: AppColors.gradientMiddle,
+      textColor: Colors.white,
+    );
   }
 
   Future<void> _handleRefresh() async {

@@ -4,6 +4,7 @@ import 'package:sycx_flutter_app/utils/constants.dart';
 import 'package:sycx_flutter_app/widgets/custom_app_bar_mini.dart';
 import 'package:sycx_flutter_app/widgets/custom_bottom_nav_bar.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:fluttertoast/fluttertoast.dart';
 
 class ContactSupport extends StatelessWidget {
   const ContactSupport({super.key});
@@ -45,22 +46,22 @@ class ContactSupport extends StatelessWidget {
               context,
               Icons.phone,
               'Call Us',
-              '0714230692',
-              'tel:0714230692',
+              '+254714230692',
+              'tel:+254714230692',
             ),
             _buildContactMethod(
               context,
               Icons.message,
               'Text Us',
-              '0714230692',
-              'sms:0714230692',
+              '+254714230692',
+              'sms:+254714230692',
             ),
             _buildContactMethod(
               context,
               FontAwesomeIcons.whatsapp,
               'WhatsApp',
-              '0714230692',
-              'https://wa.me/0714230692',
+              '+254714230692',
+              'https://wa.me/254714230692',
             ),
           ],
         ),
@@ -79,7 +80,7 @@ class ContactSupport extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 16),
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
-        onTap: () => _launchUrl(url),
+        onTap: () => _launchUrl(context, url),
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Row(
@@ -130,12 +131,33 @@ class ContactSupport extends StatelessWidget {
     );
   }
 
-  void _launchUrl(String url) async {
+  void _launchUrl(BuildContext context, String url) async {
     final Uri uri = Uri.parse(url);
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri);
-    } else {
-      print('Could not launch $url');
+    try {
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      } else {
+        // If can't launch directly, try opening in browser
+        final fallbackUrl = Uri.parse(
+            'https://web.whatsapp.com/send?phone=${uri.path.replaceAll('/', '')}');
+        if (await canLaunchUrl(fallbackUrl)) {
+          await launchUrl(fallbackUrl, mode: LaunchMode.externalApplication);
+        } else {
+          _showToast('Could not launch $url');
+        }
+      }
+    } catch (e) {
+      _showToast('Error: ${e.toString()}');
     }
+  }
+
+  void _showToast(String message) {
+    Fluttertoast.showToast(
+      msg: message,
+      toastLength: Toast.LENGTH_SHORT,
+      gravity: ToastGravity.BOTTOM,
+      backgroundColor: AppColors.gradientMiddle,
+      textColor: Colors.white,
+    );
   }
 }
