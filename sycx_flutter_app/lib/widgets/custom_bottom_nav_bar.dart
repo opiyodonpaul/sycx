@@ -83,9 +83,19 @@ class CustomBottomNavBar extends StatelessWidget {
   String getParentRoute(String route) {
     final sharedRoutes = [
       '/profile',
+      '/edit_profile',
+      '/account_settings',
+      '/data_access',
+      '/your_data',
+      '/download_data',
+      '/data_usage',
+      '/help_center',
+      '/frequent_questions',
+      '/contact_support',
+      '/user_guide',
       '/search',
       '/summary_details',
-      '/view_summary'
+      '/view_summary',
     ];
 
     if (route == '/home' ||
