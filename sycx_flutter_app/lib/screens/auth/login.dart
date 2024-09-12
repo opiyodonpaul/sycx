@@ -42,6 +42,42 @@ class LoginState extends State<Login> {
     }
   }
 
+  void _loginWithGoogle() async {
+    setState(() => _isLoading = true);
+    bool success = await Auth.signInWithGoogle();
+    setState(() => _isLoading = false);
+
+    if (success) {
+      Navigator.pushReplacementNamed(context, '/home');
+    } else {
+      Fluttertoast.showToast(
+        msg: "Google sign-in failed",
+        toastLength: Toast.LENGTH_SHORT,
+        gravity: ToastGravity.BOTTOM,
+        backgroundColor: AppColors.gradientMiddle,
+        textColor: Colors.white,
+      );
+    }
+  }
+
+  void _loginWithApple() async {
+    setState(() => _isLoading = true);
+    bool success = await Auth.signInWithApple();
+    setState(() => _isLoading = false);
+
+    if (success) {
+      Navigator.pushReplacementNamed(context, '/home');
+    } else {
+      Fluttertoast.showToast(
+        msg: "Apple sign-in failed",
+        toastLength: Toast.LENGTH_SHORT,
+        gravity: ToastGravity.BOTTOM,
+        backgroundColor: AppColors.gradientMiddle,
+        textColor: Colors.white,
+      );
+    }
+  }
+
   Future<void> _handleRefresh() async {
     setState(() {
       _formKey.currentState?.reset();
@@ -188,6 +224,26 @@ class LoginState extends State<Login> {
                                     textColor: AppColors.primaryButtonTextColor,
                                   ),
                                   const SizedBox(height: 16),
+                                  Text(
+                                    'Or sign in with',
+                                    style: AppTextStyles.bodyTextStyle,
+                                  ),
+                                  const SizedBox(height: 16),
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      _buildSocialButton(
+                                        'assets/images/google.png',
+                                        _loginWithGoogle,
+                                      ),
+                                      const SizedBox(width: 16),
+                                      _buildSocialButton(
+                                        'assets/images/apple.png',
+                                        _loginWithApple,
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 16),
                                   Center(
                                     child: TextButton(
                                       onPressed: () {
@@ -214,6 +270,33 @@ class LoginState extends State<Login> {
                   ),
                 ),
               ),
+      ),
+    );
+  }
+
+  Widget _buildSocialButton(String imagePath, VoidCallback onPressed) {
+    return Card(
+      elevation: 5,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(30),
+      ),
+      child: InkWell(
+        onTap: onPressed,
+        borderRadius: BorderRadius.circular(30),
+        child: Container(
+          width: 60,
+          height: 60,
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: AppColors.textFieldFillColor,
+            borderRadius: BorderRadius.circular(30),
+          ),
+          child: Image.asset(
+            imagePath,
+            width: 36,
+            height: 36,
+          ),
+        ),
       ),
     );
   }
