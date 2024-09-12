@@ -1,5 +1,7 @@
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:sycx_flutter_app/dummy_data.dart';
+import 'package:sycx_flutter_app/firebase_options.dart';
 import 'package:sycx_flutter_app/screens/account_settings.dart';
 import 'package:sycx_flutter_app/screens/auth/forgot_password.dart';
 import 'package:sycx_flutter_app/screens/auth/login.dart';
@@ -23,7 +25,11 @@ import 'package:sycx_flutter_app/screens/welcome.dart';
 import 'package:sycx_flutter_app/screens/home.dart';
 import 'package:sycx_flutter_app/screens/your_data.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
   runApp(const MyApp());
 }
 
