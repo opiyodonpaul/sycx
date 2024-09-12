@@ -91,13 +91,13 @@ class Welcome extends StatelessWidget {
                       children: [
                         const SizedBox(height: 20),
                         Text(
-                          'Summarize the world,\nin minutes.',
+                          'Unlock the Power of Knowledge in Seconds',
                           style: AppTextStyles.headingStyleWithShadow,
                           textAlign: TextAlign.center,
                         ),
                         const SizedBox(height: 20),
                         Text(
-                          'Read and listen to the key points from top\nnews, articles, and books.',
+                          'Experience information overload no more!\nSycX distills oceans of content into pearls of wisdom.',
                           style: AppTextStyles.subheadingStyle,
                           textAlign: TextAlign.center,
                         ),

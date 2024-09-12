@@ -21,11 +21,12 @@ class Auth {
     return false;
   }
 
-  static Future<bool> register(
-      String username, String email, String password, String profilePic) async {
+  static Future<bool> register(String fullname, String username, String email,
+      String password, String profilePic) async {
     final response = await _apiClient.post(
       '/register',
       body: jsonEncode({
+        'fullname': fullname,
         'username': username,
         'email': email,
         'password': password,

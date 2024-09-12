@@ -72,124 +72,141 @@ class LoginState extends State<Login> {
       child: Scaffold(
         body: _isLoading
             ? const Loading()
-            : RefreshIndicator(
-                onRefresh: _handleRefresh,
-                child: SingleChildScrollView(
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  child: Container(
-                    height: MediaQuery.of(context).size.height,
-                    decoration: const BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [
-                          AppColors.gradientStart,
-                          AppColors.gradientMiddle,
-                          AppColors.gradientEnd,
-                        ],
-                      ),
-                    ),
-                    child: SafeArea(
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 24.0),
-                        child: Form(
-                          key: _formKey,
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.center,
-                            children: [
-                              const SizedBox(height: 60),
-                              Center(
-                                child: Text(
-                                  'Welcome Back',
-                                  style: AppTextStyles.headingStyleWithShadow,
-                                  textAlign: TextAlign.center,
-                                ),
-                              ),
-                              const SizedBox(height: 20),
-                              Center(
-                                child: Text(
-                                  'Login to continue summarizing the world.',
-                                  style: AppTextStyles.subheadingStyle,
-                                  textAlign: TextAlign.center,
-                                ),
-                              ),
-                              const SizedBox(height: 60),
-                              CustomTextField(
-                                hintText: 'Username',
-                                onChanged: (value) => {},
-                                validator: (value) =>
-                                    value!.isEmpty ? 'Enter username' : null,
-                                focusNode: _usernameFocusNode,
-                                onFieldSubmitted: (_) {
-                                  FocusScope.of(context)
-                                      .requestFocus(_passwordFocusNode);
-                                },
-                                prefixIcon: Icons.person,
-                                controller: _usernameController,
-                              ),
-                              const SizedBox(height: 16),
-                              CustomTextField(
-                                hintText: 'Password',
-                                obscureText: _obscurePassword,
-                                onChanged: (value) => {},
-                                validator: (value) =>
-                                    value!.isEmpty ? 'Enter password' : null,
-                                focusNode: _passwordFocusNode,
-                                onFieldSubmitted: (_) => _login(),
-                                prefixIcon: Icons.lock,
-                                suffixIcon: IconButton(
-                                  icon: Icon(
-                                    _obscurePassword
-                                        ? Icons.visibility_off
-                                        : Icons.visibility,
-                                    color: AppColors.secondaryTextColor,
-                                  ),
-                                  onPressed: () {
-                                    setState(() {
-                                      _obscurePassword = !_obscurePassword;
-                                    });
-                                  },
-                                ),
-                                controller: _passwordController,
-                              ),
-                              const SizedBox(height: 16),
-                              Center(
-                                child: TextButton(
-                                  onPressed: () {
-                                    Navigator.pushReplacementNamed(
-                                        context, '/forgot_password');
-                                  },
-                                  child: Text(
-                                    'Forgot Password?',
-                                    style: AppTextStyles.bodyTextStyle.copyWith(
-                                      color: AppColors.primaryTextColor,
+            : Container(
+                height: MediaQuery.of(context).size.height,
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      AppColors.gradientStart,
+                      AppColors.gradientMiddle,
+                      AppColors.gradientEnd,
+                    ],
+                  ),
+                ),
+                child: SafeArea(
+                  child: RefreshIndicator(
+                    onRefresh: _handleRefresh,
+                    child: SingleChildScrollView(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      child: ConstrainedBox(
+                        constraints: BoxConstraints(
+                          minHeight: MediaQuery.of(context).size.height -
+                              MediaQuery.of(context).padding.top -
+                              MediaQuery.of(context).padding.bottom,
+                        ),
+                        child: IntrinsicHeight(
+                          child: Padding(
+                            padding:
+                                const EdgeInsets.symmetric(horizontal: 24.0),
+                            child: Form(
+                              key: _formKey,
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.center,
+                                children: [
+                                  const SizedBox(height: 60),
+                                  Center(
+                                    child: Text(
+                                      'Welcome Back, Ready to Dive In?',
+                                      style:
+                                          AppTextStyles.headingStyleWithShadow,
+                                      textAlign: TextAlign.center,
                                     ),
                                   ),
-                                ),
-                              ),
-                              const SizedBox(height: 24),
-                              AnimatedButton(
-                                text: 'Login',
-                                onPressed: _login,
-                                backgroundColor: AppColors.primaryButtonColor,
-                                textColor: AppColors.primaryButtonTextColor,
-                              ),
-                              const SizedBox(height: 16),
-                              Center(
-                                child: TextButton(
-                                  onPressed: () {
-                                    Navigator.pushReplacementNamed(
-                                        context, '/register');
-                                  },
-                                  child: Text(
-                                    'Don\'t have an account? Sign up',
-                                    style: AppTextStyles.bodyTextStyle.copyWith(
-                                      color: AppColors.primaryTextColor,
+                                  const SizedBox(height: 20),
+                                  Center(
+                                    child: Text(
+                                      'Reconnect and continue your journey of simplifying the complex. SycX is here to keep you ahead with just a few clicks.',
+                                      style: AppTextStyles.subheadingStyle,
+                                      textAlign: TextAlign.center,
                                     ),
                                   ),
-                                ),
+                                  const SizedBox(height: 60),
+                                  CustomTextField(
+                                    hintText: 'Username',
+                                    onChanged: (value) => {},
+                                    validator: (value) => value!.isEmpty
+                                        ? 'Enter username'
+                                        : null,
+                                    focusNode: _usernameFocusNode,
+                                    onFieldSubmitted: (_) {
+                                      FocusScope.of(context)
+                                          .requestFocus(_passwordFocusNode);
+                                    },
+                                    prefixIcon: Icons.person,
+                                    controller: _usernameController,
+                                  ),
+                                  const SizedBox(height: 16),
+                                  CustomTextField(
+                                    hintText: 'Password',
+                                    obscureText: _obscurePassword,
+                                    onChanged: (value) => {},
+                                    validator: (value) => value!.isEmpty
+                                        ? 'Enter password'
+                                        : null,
+                                    focusNode: _passwordFocusNode,
+                                    onFieldSubmitted: (_) => _login(),
+                                    prefixIcon: Icons.lock,
+                                    suffixIcon: IconButton(
+                                      icon: Icon(
+                                        _obscurePassword
+                                            ? Icons.visibility_off
+                                            : Icons.visibility,
+                                        color: AppColors.secondaryTextColor,
+                                      ),
+                                      onPressed: () {
+                                        setState(() {
+                                          _obscurePassword = !_obscurePassword;
+                                        });
+                                      },
+                                    ),
+                                    controller: _passwordController,
+                                  ),
+                                  const SizedBox(height: 16),
+                                  Center(
+                                    child: TextButton(
+                                      onPressed: () {
+                                        Navigator.pushReplacementNamed(
+                                            context, '/forgot_password');
+                                      },
+                                      child: Text(
+                                        'Forgot Password?',
+                                        style: AppTextStyles.bodyTextStyle
+                                            .copyWith(
+                                          color: AppColors.primaryTextColor,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 24),
+                                  AnimatedButton(
+                                    text: 'Login',
+                                    onPressed: _login,
+                                    backgroundColor:
+                                        AppColors.primaryButtonColor,
+                                    textColor: AppColors.primaryButtonTextColor,
+                                  ),
+                                  const SizedBox(height: 16),
+                                  Center(
+                                    child: TextButton(
+                                      onPressed: () {
+                                        Navigator.pushReplacementNamed(
+                                            context, '/register');
+                                      },
+                                      child: Text(
+                                        'Don\'t have an account? Sign up',
+                                        style: AppTextStyles.bodyTextStyle
+                                            .copyWith(
+                                          color: AppColors.primaryTextColor,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 24),
+                                ],
                               ),
-                            ],
+                            ),
                           ),
                         ),
                       ),
