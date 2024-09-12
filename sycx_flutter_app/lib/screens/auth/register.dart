@@ -7,7 +7,6 @@ import 'package:sycx_flutter_app/utils/constants.dart';
 import 'package:sycx_flutter_app/widgets/custom_textfield.dart';
 import 'package:sycx_flutter_app/widgets/animated_button.dart';
 import 'dart:io';
-
 import 'package:sycx_flutter_app/widgets/loading.dart';
 
 class Register extends StatefulWidget {
@@ -19,9 +18,11 @@ class Register extends StatefulWidget {
 
 class RegisterState extends State<Register> {
   final _formKey = GlobalKey<FormState>();
+  final _fullnameFocusNode = FocusNode();
   final _usernameFocusNode = FocusNode();
   final _emailFocusNode = FocusNode();
   final _passwordFocusNode = FocusNode();
+  final _fullnameController = TextEditingController();
   final _usernameController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
@@ -32,6 +33,7 @@ class RegisterState extends State<Register> {
   void _refreshForm() {
     setState(() {
       _formKey.currentState?.reset();
+      _fullnameController.clear();
       _usernameController.clear();
       _emailController.clear();
       _passwordController.clear();
@@ -46,21 +48,14 @@ class RegisterState extends State<Register> {
 
   void _register() async {
     if (_formKey.currentState!.validate()) {
-      if (_selectedImage == null) {
-        Fluttertoast.showToast(
-          msg: "Please select a profile picture",
-          toastLength: Toast.LENGTH_SHORT,
-          gravity: ToastGravity.BOTTOM,
-          backgroundColor: AppColors.gradientMiddle,
-          textColor: Colors.white,
-        );
-        return;
-      }
-
       setState(() => _isLoading = true);
       final base64Image = await convertFileToBase64(_selectedImage!);
-      bool success = await Auth.register(_usernameController.text,
-          _emailController.text, _passwordController.text, base64Image);
+      bool success = await Auth.register(
+          _fullnameController.text,
+          _usernameController.text,
+          _emailController.text,
+          _passwordController.text,
+          base64Image);
       setState(() => _isLoading = false);
 
       if (success) {
@@ -89,6 +84,7 @@ class RegisterState extends State<Register> {
 
   @override
   void dispose() {
+    _fullnameFocusNode.dispose();
     _usernameFocusNode.dispose();
     _emailFocusNode.dispose();
     _passwordFocusNode.dispose();
@@ -110,159 +106,193 @@ class RegisterState extends State<Register> {
       child: Scaffold(
         body: _isLoading
             ? const Loading()
-            : RefreshIndicator(
-                onRefresh: _handleRefresh,
-                child: SingleChildScrollView(
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  child: Container(
-                    height: MediaQuery.of(context).size.height,
-                    decoration: const BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [
-                          AppColors.gradientStart,
-                          AppColors.gradientMiddle,
-                          AppColors.gradientEnd,
-                        ],
-                      ),
-                    ),
-                    child: SafeArea(
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 24.0),
-                        child: Form(
-                          key: _formKey,
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.center,
-                            children: [
-                              const SizedBox(height: 40),
-                              Center(
-                                child: Text(
-                                  'Create Account',
-                                  style: AppTextStyles.headingStyleWithShadow,
-                                  textAlign: TextAlign.center,
-                                ),
-                              ),
-                              const SizedBox(height: 20),
-                              Center(
-                                child: Text(
-                                  'Join us and start summarizing the world.',
-                                  style: AppTextStyles.subheadingStyle,
-                                  textAlign: TextAlign.center,
-                                ),
-                              ),
-                              const SizedBox(height: 40),
-                              if (_selectedImage != null)
-                                Center(
-                                  child: Container(
-                                    width: 180,
-                                    height: 180,
-                                    decoration: BoxDecoration(
-                                      shape: BoxShape.circle,
-                                      border: Border.all(
-                                        color: AppColors.primaryButtonColor,
-                                        width: 3,
-                                      ),
-                                      boxShadow: [
-                                        BoxShadow(
-                                          color: AppColors.primaryButtonColor
-                                              .withOpacity(0.3),
-                                          blurRadius: 10,
-                                          spreadRadius: 2,
+            : Container(
+                height: MediaQuery.of(context).size.height,
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      AppColors.gradientStart,
+                      AppColors.gradientMiddle,
+                      AppColors.gradientEnd,
+                    ],
+                  ),
+                ),
+                child: SafeArea(
+                  child: RefreshIndicator(
+                    onRefresh: _handleRefresh,
+                    child: SingleChildScrollView(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      child: ConstrainedBox(
+                        constraints: BoxConstraints(
+                          minHeight: MediaQuery.of(context).size.height -
+                              MediaQuery.of(context).padding.top -
+                              MediaQuery.of(context).padding.bottom,
+                        ),
+                        child: IntrinsicHeight(
+                          child: Padding(
+                            padding:
+                                const EdgeInsets.symmetric(horizontal: 24.0),
+                            child: Form(
+                              key: _formKey,
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.center,
+                                children: [
+                                  const SizedBox(height: 40),
+                                  Center(
+                                    child: Text(
+                                      'Create Your Account, Unlock the Future',
+                                      style:
+                                          AppTextStyles.headingStyleWithShadow,
+                                      textAlign: TextAlign.center,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 20),
+                                  Center(
+                                    child: Text(
+                                      'Join a community transforming how knowledge is consumed. Start summarizing the world’s information in seconds with SycX.',
+                                      style: AppTextStyles.subheadingStyle,
+                                      textAlign: TextAlign.center,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 40),
+                                  if (_selectedImage != null)
+                                    Center(
+                                      child: Container(
+                                        width: 180,
+                                        height: 180,
+                                        decoration: BoxDecoration(
+                                          shape: BoxShape.circle,
+                                          border: Border.all(
+                                            color: AppColors.primaryButtonColor,
+                                            width: 3,
+                                          ),
+                                          boxShadow: [
+                                            BoxShadow(
+                                              color: AppColors
+                                                  .primaryButtonColor
+                                                  .withOpacity(0.3),
+                                              blurRadius: 10,
+                                              spreadRadius: 2,
+                                            ),
+                                          ],
                                         ),
-                                      ],
+                                        child: ClipOval(
+                                          child: Image.file(
+                                            _selectedImage!,
+                                            fit: BoxFit.cover,
+                                          ),
+                                        ),
+                                      ),
                                     ),
-                                    child: ClipOval(
-                                      child: Image.file(
-                                        _selectedImage!,
-                                        fit: BoxFit.cover,
+                                  const SizedBox(height: 24),
+                                  AnimatedButton(
+                                    text: 'Select Profile Picture',
+                                    onPressed: _selectProfilePicture,
+                                    backgroundColor:
+                                        AppColors.secondaryButtonColor,
+                                    textColor:
+                                        AppColors.secondaryButtonTextColor,
+                                  ),
+                                  const SizedBox(height: 24),
+                                  CustomTextField(
+                                    hintText: 'Fullname',
+                                    onChanged: (value) => {},
+                                    validator: (value) => value!.isEmpty
+                                        ? 'Enter fullname'
+                                        : null,
+                                    focusNode: _fullnameFocusNode,
+                                    onFieldSubmitted: (_) {
+                                      FocusScope.of(context)
+                                          .requestFocus(_usernameFocusNode);
+                                    },
+                                    prefixIcon: Icons.badge,
+                                    controller: _fullnameController,
+                                  ),
+                                  const SizedBox(height: 16),
+                                  CustomTextField(
+                                    hintText: 'Username',
+                                    onChanged: (value) => {},
+                                    validator: (value) => value!.isEmpty
+                                        ? 'Enter username'
+                                        : null,
+                                    focusNode: _usernameFocusNode,
+                                    onFieldSubmitted: (_) {
+                                      FocusScope.of(context)
+                                          .requestFocus(_emailFocusNode);
+                                    },
+                                    prefixIcon: Icons.person,
+                                    controller: _usernameController,
+                                  ),
+                                  const SizedBox(height: 16),
+                                  CustomTextField(
+                                    hintText: 'Email',
+                                    onChanged: (value) => {},
+                                    validator: (value) =>
+                                        value!.isEmpty ? 'Enter email' : null,
+                                    focusNode: _emailFocusNode,
+                                    onFieldSubmitted: (_) {
+                                      FocusScope.of(context)
+                                          .requestFocus(_passwordFocusNode);
+                                    },
+                                    prefixIcon: Icons.email,
+                                    controller: _emailController,
+                                  ),
+                                  const SizedBox(height: 16),
+                                  CustomTextField(
+                                    hintText: 'Password',
+                                    obscureText: _obscurePassword,
+                                    onChanged: (value) => {},
+                                    validator: (value) => value!.isEmpty
+                                        ? 'Enter password'
+                                        : null,
+                                    focusNode: _passwordFocusNode,
+                                    onFieldSubmitted: (_) => _register(),
+                                    prefixIcon: Icons.lock,
+                                    suffixIcon: IconButton(
+                                      icon: Icon(
+                                        _obscurePassword
+                                            ? Icons.visibility_off
+                                            : Icons.visibility,
+                                        color: AppColors.secondaryTextColor,
+                                      ),
+                                      onPressed: () {
+                                        setState(() {
+                                          _obscurePassword = !_obscurePassword;
+                                        });
+                                      },
+                                    ),
+                                    controller: _passwordController,
+                                  ),
+                                  const SizedBox(height: 24),
+                                  AnimatedButton(
+                                    text: 'Register',
+                                    onPressed: _register,
+                                    backgroundColor:
+                                        AppColors.primaryButtonColor,
+                                    textColor: AppColors.primaryButtonTextColor,
+                                  ),
+                                  const SizedBox(height: 16),
+                                  Center(
+                                    child: TextButton(
+                                      onPressed: () {
+                                        Navigator.pushReplacementNamed(
+                                            context, '/login');
+                                      },
+                                      child: Text(
+                                        'Already have an account? Log in',
+                                        style: AppTextStyles.bodyTextStyle
+                                            .copyWith(
+                                          color: AppColors.primaryTextColor,
+                                        ),
                                       ),
                                     ),
                                   ),
-                                ),
-                              const SizedBox(height: 24),
-                              AnimatedButton(
-                                text: 'Select Profile Picture',
-                                onPressed: _selectProfilePicture,
-                                backgroundColor: AppColors.secondaryButtonColor,
-                                textColor: AppColors.secondaryButtonTextColor,
+                                  const SizedBox(height: 24),
+                                ],
                               ),
-                              const SizedBox(height: 24),
-                              CustomTextField(
-                                hintText: 'Username',
-                                onChanged: (value) => {},
-                                validator: (value) =>
-                                    value!.isEmpty ? 'Enter username' : null,
-                                focusNode: _usernameFocusNode,
-                                onFieldSubmitted: (_) {
-                                  FocusScope.of(context)
-                                      .requestFocus(_emailFocusNode);
-                                },
-                                prefixIcon: Icons.person,
-                                controller: _usernameController,
-                              ),
-                              const SizedBox(height: 16),
-                              CustomTextField(
-                                hintText: 'Email',
-                                onChanged: (value) => {},
-                                validator: (value) =>
-                                    value!.isEmpty ? 'Enter email' : null,
-                                focusNode: _emailFocusNode,
-                                onFieldSubmitted: (_) {
-                                  FocusScope.of(context)
-                                      .requestFocus(_passwordFocusNode);
-                                },
-                                prefixIcon: Icons.email,
-                                controller: _emailController,
-                              ),
-                              const SizedBox(height: 16),
-                              CustomTextField(
-                                hintText: 'Password',
-                                obscureText: _obscurePassword,
-                                onChanged: (value) => {},
-                                validator: (value) =>
-                                    value!.isEmpty ? 'Enter password' : null,
-                                focusNode: _passwordFocusNode,
-                                onFieldSubmitted: (_) => _register(),
-                                prefixIcon: Icons.lock,
-                                suffixIcon: IconButton(
-                                  icon: Icon(
-                                    _obscurePassword
-                                        ? Icons.visibility_off
-                                        : Icons.visibility,
-                                    color: AppColors.secondaryTextColor,
-                                  ),
-                                  onPressed: () {
-                                    setState(() {
-                                      _obscurePassword = !_obscurePassword;
-                                    });
-                                  },
-                                ),
-                                controller: _passwordController,
-                              ),
-                              const SizedBox(height: 24),
-                              AnimatedButton(
-                                text: 'Register',
-                                onPressed: _register,
-                                backgroundColor: AppColors.primaryButtonColor,
-                                textColor: AppColors.primaryButtonTextColor,
-                              ),
-                              const SizedBox(height: 16),
-                              Center(
-                                child: TextButton(
-                                  onPressed: () {
-                                    Navigator.pushReplacementNamed(
-                                        context, '/login');
-                                  },
-                                  child: Text(
-                                    'Already have an account? Log in',
-                                    style: AppTextStyles.bodyTextStyle.copyWith(
-                                      color: AppColors.primaryTextColor,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ],
+                            ),
                           ),
                         ),
                       ),

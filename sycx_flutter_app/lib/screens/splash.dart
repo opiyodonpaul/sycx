@@ -40,7 +40,7 @@ class SplashState extends State<Splash> with SingleTickerProviderStateMixin {
     if (token != null) {
       Navigator.pushReplacementNamed(context, '/home');
     } else {
-      Navigator.pushReplacementNamed(context, '/home');
+      Navigator.pushReplacementNamed(context, '/welcome');
     }
   }
 
