@@ -139,7 +139,7 @@ class UploadState extends State<Upload> with SingleTickerProviderStateMixin {
             });
           },
         );
-        summaries.add(summary);
+        summaries.add(summary!);
       }
 
       Navigator.of(context).pop();

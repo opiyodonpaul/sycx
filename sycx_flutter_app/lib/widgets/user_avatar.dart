@@ -1,10 +1,32 @@
 import 'package:flutter/material.dart';
+import 'package:sycx_flutter_app/screens/auth/login.dart';
 import 'package:sycx_flutter_app/utils/constants.dart';
+import 'package:sycx_flutter_app/services/auth.dart';
+import 'package:sycx_flutter_app/widgets/loading.dart';
 
 class UserAvatar extends StatelessWidget {
   final Map<String, String> user;
+  final Auth _auth = Auth();
 
-  const UserAvatar({super.key, required this.user});
+  UserAvatar({super.key, required this.user});
+
+  void _handleLogout(BuildContext context) async {
+    // Show loading screen
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) => const Loading(),
+    );
+
+    // Perform logout
+    await _auth.signOut();
+
+    // Close loading screen and navigate to login
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (context) => const Login()),
+      (Route<dynamic> route) => false,
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -46,7 +68,8 @@ class UserAvatar extends StatelessWidget {
                 style: AppTextStyles.bodyTextStyle
                     .copyWith(color: AppColors.gradientEnd)),
             onPressed: () {
-              // Implement actual logout logic here
+              Navigator.of(context).pop(); // Close the popup menu
+              _handleLogout(context);
             },
           ),
         ),
