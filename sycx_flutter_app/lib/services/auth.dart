@@ -107,6 +107,17 @@ class Auth {
             createdAt: DateTime.now(),
             updatedAt: DateTime.now(),
           ));
+        } else {
+          // User exists, update their information
+          await _database.updateUser(app_user.User(
+            id: user.uid,
+            fullName: user.displayName ?? existingUser.fullName,
+            userName: existingUser.userName,
+            email: user.email ?? existingUser.email,
+            userProfile: user.photoURL ?? existingUser.userProfile,
+            createdAt: existingUser.createdAt,
+            updatedAt: DateTime.now(),
+          ));
         }
         return {'success': true, 'user': user};
       }
@@ -119,7 +130,7 @@ class Auth {
     }
   }
 
-  // Apple Sign In
+// Apple Sign In
   Future<Map<String, dynamic>> signInWithApple() async {
     try {
       final credential = await SignInWithApple.getAppleIDCredential(
@@ -150,6 +161,17 @@ class Auth {
             email: user.email ?? '',
             userProfile: user.photoURL ?? '',
             createdAt: DateTime.now(),
+            updatedAt: DateTime.now(),
+          ));
+        } else {
+          // User exists, update their information
+          await _database.updateUser(app_user.User(
+            id: user.uid,
+            fullName: existingUser.fullName,
+            userName: existingUser.userName,
+            email: user.email ?? existingUser.email,
+            userProfile: user.photoURL ?? existingUser.userProfile,
+            createdAt: existingUser.createdAt,
             updatedAt: DateTime.now(),
           ));
         }
