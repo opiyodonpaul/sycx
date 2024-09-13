@@ -1,7 +1,6 @@
 import 'dart:convert';
 import 'dart:math';
 import 'package:http/http.dart' as http;
-import 'package:sycx_flutter_app/dummy_data.dart';
 import 'package:sycx_flutter_app/models/summary.dart';
 import 'package:sycx_flutter_app/services/api_client.dart';
 import 'package:sycx_flutter_app/utils/secure_storage.dart';
@@ -9,7 +8,7 @@ import 'package:sycx_flutter_app/utils/secure_storage.dart';
 class SummaryService {
   static final ApiClient apiClient = ApiClient(httpClient: http.Client());
 
-  static Future<Summary> summarizeDocument(
+  static Future<Summary?> summarizeDocument(
       String userId, dynamic document, Function(double) updateProgress) async {
     // Simulate summarization process
     final random = Random();
@@ -20,17 +19,15 @@ class SummaryService {
     }
 
     // Return a dummy summary
-    final dummySummary =
-        DummyData.summaries[random.nextInt(DummyData.summaries.length)];
-    return Summary.fromJson(dummySummary);
+    return null;
   }
 
-  static Future<List<Summary>> getSummaries(String userId) async {
+  static Future<List<Summary>?> getSummaries(String userId) async {
     // Simulate API call delay
     await Future.delayed(const Duration(seconds: 1));
 
     // Return dummy summaries
-    return DummyData.summaries.map((json) => Summary.fromJson(json)).toList();
+    return null;
   }
 
   static Future<void> giveFeedback(
@@ -78,7 +75,7 @@ class SummaryService {
     throw Exception('Failed to download summary');
   }
 
-  static Future<List<Summary>> getUserSummaries(String userId) async {
+  static Future<List<Summary>?> getUserSummaries(String userId) async {
     final token = await SecureStorage.getToken();
     final response = await apiClient.get(
       '/usersummaries?user_id=$userId',
@@ -87,8 +84,8 @@ class SummaryService {
     );
 
     if (response.statusCode == 200) {
-      List<dynamic> jsonResponse = jsonDecode(response.body);
-      return jsonResponse.map((json) => Summary.fromJson(json)).toList();
+      jsonDecode(response.body);
+      return null;
     } else {
       throw Exception('Failed to load user summaries');
     }

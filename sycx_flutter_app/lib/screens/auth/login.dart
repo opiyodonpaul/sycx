@@ -25,14 +25,16 @@ class LoginState extends State<Login> {
   void _login() async {
     if (_formKey.currentState!.validate()) {
       setState(() => _isLoading = true);
-      bool success =
-          await Auth.login(_usernameController.text, _passwordController.text);
+      Map<String, dynamic> result = await Auth().signInWithEmailAndPassword(
+        _usernameController.text,
+        _passwordController.text,
+      );
       setState(() => _isLoading = false);
-      if (success) {
+      if (result['success']) {
         Navigator.pushReplacementNamed(context, '/home');
       } else {
         Fluttertoast.showToast(
-          msg: "Login failed",
+          msg: result['message'],
           toastLength: Toast.LENGTH_SHORT,
           gravity: ToastGravity.BOTTOM,
           backgroundColor: AppColors.gradientMiddle,
@@ -44,14 +46,14 @@ class LoginState extends State<Login> {
 
   void _loginWithGoogle() async {
     setState(() => _isLoading = true);
-    bool success = await Auth.signInWithGoogle();
+    Map<String, dynamic> result = await Auth().signInWithGoogle();
     setState(() => _isLoading = false);
 
-    if (success) {
+    if (result['success']) {
       Navigator.pushReplacementNamed(context, '/home');
     } else {
       Fluttertoast.showToast(
-        msg: "Google sign-in failed",
+        msg: result['message'],
         toastLength: Toast.LENGTH_SHORT,
         gravity: ToastGravity.BOTTOM,
         backgroundColor: AppColors.gradientMiddle,
@@ -62,14 +64,14 @@ class LoginState extends State<Login> {
 
   void _loginWithApple() async {
     setState(() => _isLoading = true);
-    bool success = await Auth.signInWithApple();
+    Map<String, dynamic> result = await Auth().signInWithApple();
     setState(() => _isLoading = false);
 
-    if (success) {
+    if (result['success']) {
       Navigator.pushReplacementNamed(context, '/home');
     } else {
       Fluttertoast.showToast(
-        msg: "Apple sign-in failed",
+        msg: result['message'],
         toastLength: Toast.LENGTH_SHORT,
         gravity: ToastGravity.BOTTOM,
         backgroundColor: AppColors.gradientMiddle,

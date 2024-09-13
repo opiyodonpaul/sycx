@@ -1,35 +1,45 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+
 class User {
   final String id;
-  final String fullname;
-  final String username;
+  final String fullName;
+  final String userName;
   final String email;
-  final String? profilePic;
+  final String userProfile;
+  final DateTime createdAt;
+  final DateTime updatedAt;
 
   User({
     required this.id,
-    required this.fullname,
-    required this.username,
+    required this.fullName,
+    required this.userName,
     required this.email,
-    this.profilePic,
+    required this.userProfile,
+    required this.createdAt,
+    required this.updatedAt,
   });
 
-  factory User.fromJson(Map<String, dynamic> json) {
+  factory User.fromFirestore(DocumentSnapshot doc) {
+    Map data = doc.data() as Map<String, dynamic>;
     return User(
-      id: json['_id'] ?? '',
-      fullname: json['fullname'] ?? '',
-      username: json['username'] ?? '',
-      email: json['email'] ?? '',
-      profilePic: json['profile_pic'],
+      id: doc.id,
+      fullName: data['fullName'] ?? '',
+      userName: data['userName'] ?? '',
+      email: data['email'] ?? '',
+      userProfile: data['userProfile'] ?? '',
+      createdAt: (data['createdAt'] as Timestamp).toDate(),
+      updatedAt: (data['updatedAt'] as Timestamp).toDate(),
     );
   }
 
-  Map<String, dynamic> toJson() {
+  Map<String, dynamic> toFirestore() {
     return {
-      '_id': id,
-      'fullname': fullname,
-      'username': username,
+      'fullName': fullName,
+      'userName': userName,
       'email': email,
-      'profile_pic': profilePic,
+      'userProfile': userProfile,
+      'createdAt': Timestamp.fromDate(createdAt),
+      'updatedAt': Timestamp.fromDate(updatedAt),
     };
   }
 }

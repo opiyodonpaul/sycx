@@ -50,19 +50,20 @@ class RegisterState extends State<Register> {
     if (_formKey.currentState!.validate()) {
       setState(() => _isLoading = true);
       final base64Image = await convertFileToBase64(_selectedImage!);
-      bool success = await Auth.register(
-          _fullnameController.text,
-          _usernameController.text,
-          _emailController.text,
-          _passwordController.text,
-          base64Image);
+      Map<String, dynamic> result = await Auth().registerWithEmailAndPassword(
+        _fullnameController.text,
+        _usernameController.text,
+        _emailController.text,
+        _passwordController.text,
+        base64Image,
+      );
       setState(() => _isLoading = false);
 
-      if (success) {
+      if (result['success']) {
         Navigator.pushReplacementNamed(context, '/home');
       } else {
         Fluttertoast.showToast(
-          msg: "Registration failed",
+          msg: result['message'],
           toastLength: Toast.LENGTH_SHORT,
           gravity: ToastGravity.BOTTOM,
           backgroundColor: AppColors.gradientMiddle,
@@ -84,14 +85,14 @@ class RegisterState extends State<Register> {
 
   void _registerWithGoogle() async {
     setState(() => _isLoading = true);
-    bool success = await Auth.signInWithGoogle();
+    Map<String, dynamic> result = await Auth().signInWithGoogle();
     setState(() => _isLoading = false);
 
-    if (success) {
+    if (result['success']) {
       Navigator.pushReplacementNamed(context, '/home');
     } else {
       Fluttertoast.showToast(
-        msg: "Google sign-in failed",
+        msg: result['message'],
         toastLength: Toast.LENGTH_SHORT,
         gravity: ToastGravity.BOTTOM,
         backgroundColor: AppColors.gradientMiddle,
@@ -102,14 +103,14 @@ class RegisterState extends State<Register> {
 
   void _registerWithApple() async {
     setState(() => _isLoading = true);
-    bool success = await Auth.signInWithApple();
+    Map<String, dynamic> result = await Auth().signInWithApple();
     setState(() => _isLoading = false);
 
-    if (success) {
+    if (result['success']) {
       Navigator.pushReplacementNamed(context, '/home');
     } else {
       Fluttertoast.showToast(
-        msg: "Apple sign-in failed",
+        msg: result['message'],
         toastLength: Toast.LENGTH_SHORT,
         gravity: ToastGravity.BOTTOM,
         backgroundColor: AppColors.gradientMiddle,

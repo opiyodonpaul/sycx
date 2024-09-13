@@ -22,7 +22,8 @@ class ForgotPasswordState extends State<ForgotPassword> {
   void _resetPassword() async {
     if (_formKey.currentState!.validate()) {
       setState(() => _isLoading = true);
-      bool success = await Auth.resetPassword(_emailController.text);
+      bool success =
+          (await Auth().sendPasswordResetEmail(_emailController.text)) as bool;
       setState(() => _isLoading = false);
       if (success) {
         Fluttertoast.showToast(
