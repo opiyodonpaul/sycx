@@ -55,16 +55,30 @@ class RegisterState extends State<Register> {
       }
       try {
         // Trim whitespace from input
+        String fullname = _fullnameController.text.trim();
+        String username = _usernameController.text.trim();
         String email = _emailController.text.trim();
         String password = _passwordController.text.trim();
 
-        if (email.isEmpty || password.isEmpty) {
-          throw Exception('Email and password cannot be empty');
+        // Log form data (remove in production)
+        print('Registering user with:');
+        print('Fullname: $fullname');
+        print('Username: $username');
+        print('Email: $email');
+        print('Password: ${password.replaceAll(RegExp(r'.'), '*')}');
+        print(
+            'Profile picture: ${base64Image.isNotEmpty ? 'Provided' : 'Not provided'}');
+
+        if (fullname.isEmpty ||
+            username.isEmpty ||
+            email.isEmpty ||
+            password.isEmpty) {
+          throw Exception('All fields except profile picture are required');
         }
 
         Map<String, dynamic> result = await Auth().registerWithEmailAndPassword(
-          _fullnameController.text.trim(),
-          _usernameController.text.trim(),
+          fullname,
+          username,
           email,
           password,
           base64Image,
@@ -75,7 +89,7 @@ class RegisterState extends State<Register> {
           Navigator.pushReplacementNamed(context, '/home');
         } else {
           Fluttertoast.showToast(
-            msg: result['message'],
+            msg: result['message'] ?? 'Registration failed. Please try again.',
             toastLength: Toast.LENGTH_LONG,
             gravity: ToastGravity.BOTTOM,
             backgroundColor: AppColors.gradientMiddle,
@@ -86,13 +100,22 @@ class RegisterState extends State<Register> {
         setState(() => _isLoading = false);
         print('Error during registration: $e');
         Fluttertoast.showToast(
-          msg: e.toString(),
+          msg: 'Registration failed: ${e.toString()}',
           toastLength: Toast.LENGTH_LONG,
           gravity: ToastGravity.BOTTOM,
           backgroundColor: AppColors.gradientMiddle,
           textColor: Colors.white,
         );
       }
+    } else {
+      // Form is not valid, show a toast
+      Fluttertoast.showToast(
+        msg: 'Please fill all required fields correctly',
+        toastLength: Toast.LENGTH_LONG,
+        gravity: ToastGravity.BOTTOM,
+        backgroundColor: AppColors.gradientMiddle,
+        textColor: Colors.white,
+      );
     }
   }
 
@@ -258,10 +281,13 @@ class RegisterState extends State<Register> {
                                   const SizedBox(height: 24),
                                   CustomTextField(
                                     hintText: 'Fullname',
-                                    onChanged: (value) => {},
-                                    validator: (value) => value!.isEmpty
-                                        ? 'Enter fullname'
-                                        : null,
+                                    validator: (value) {
+                                      if (value == null ||
+                                          value.trim().isEmpty) {
+                                        return 'Fullname is required';
+                                      }
+                                      return null;
+                                    },
                                     focusNode: _fullnameFocusNode,
                                     onFieldSubmitted: (_) {
                                       FocusScope.of(context)
@@ -273,10 +299,13 @@ class RegisterState extends State<Register> {
                                   const SizedBox(height: 16),
                                   CustomTextField(
                                     hintText: 'Username',
-                                    onChanged: (value) => {},
-                                    validator: (value) => value!.isEmpty
-                                        ? 'Enter username'
-                                        : null,
+                                    validator: (value) {
+                                      if (value == null ||
+                                          value.trim().isEmpty) {
+                                        return 'Username is required';
+                                      }
+                                      return null;
+                                    },
                                     focusNode: _usernameFocusNode,
                                     onFieldSubmitted: (_) {
                                       FocusScope.of(context)
@@ -288,15 +317,15 @@ class RegisterState extends State<Register> {
                                   const SizedBox(height: 16),
                                   CustomTextField(
                                     hintText: 'Email',
-                                    onChanged: (value) => {},
                                     validator: (value) {
-                                      if (value == null || value.isEmpty) {
-                                        return 'Please enter an email';
+                                      if (value == null ||
+                                          value.trim().isEmpty) {
+                                        return 'Email is required';
                                       }
                                       if (!RegExp(
                                               r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$')
                                           .hasMatch(value)) {
-                                        return 'Please enter a valid email';
+                                        return 'Please enter a valid email address';
                                       }
                                       return null;
                                     },
@@ -312,13 +341,18 @@ class RegisterState extends State<Register> {
                                   CustomTextField(
                                     hintText: 'Password',
                                     obscureText: _obscurePassword,
-                                    onChanged: (value) => {},
                                     validator: (value) {
-                                      if (value == null || value.isEmpty) {
-                                        return 'Please enter a password';
+                                      if (value == null ||
+                                          value.trim().isEmpty) {
+                                        return 'Password is required';
                                       }
-                                      if (value.length < 6) {
-                                        return 'Password must be at least 6 characters long';
+                                      if (value.length < 8) {
+                                        return 'Password must be at least 8 characters long';
+                                      }
+                                      if (!RegExp(
+                                              r'^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$')
+                                          .hasMatch(value)) {
+                                        return 'Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character';
                                       }
                                       return null;
                                     },
