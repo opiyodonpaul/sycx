@@ -1,3 +1,5 @@
+import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:sycx_flutter_app/services/auth.dart';
 import 'package:fluttertoast/fluttertoast.dart';
@@ -29,6 +31,7 @@ class RegisterState extends State<Register> {
   File? _selectedImage;
   bool _obscurePassword = true;
   bool _isLoading = false;
+  Timer? _debounceTimer;
 
   void _refreshForm() {
     setState(() {
@@ -46,86 +49,82 @@ class RegisterState extends State<Register> {
     return Future.delayed(const Duration(seconds: 1));
   }
 
-  void _register() async {
-    if (_formKey.currentState!.validate()) {
-      setState(() => _isLoading = true);
-      String base64Image = '';
-      if (_selectedImage != null) {
-        base64Image = await convertFileToBase64(_selectedImage!);
-      }
-      try {
-        // Trim whitespace from input
-        String fullname = _fullnameController.text.trim();
-        String username = _usernameController.text.trim();
-        String email = _emailController.text.trim();
-        String password = _passwordController.text.trim();
+  void _register() {
+    if (_debounceTimer?.isActive ?? false) return;
 
-        // Log form data (remove in production)
-        print('Registering user with:');
-        print('Fullname: $fullname');
-        print('Username: $username');
-        print('Email: $email');
-        print('Password: ${password.replaceAll(RegExp(r'.'), '*')}');
-        print(
-            'Profile picture: ${base64Image.isNotEmpty ? 'Provided' : 'Not provided'}');
+    _debounceTimer = Timer(const Duration(milliseconds: 300), () async {
+      if (_formKey.currentState!.validate()) {
+        setState(() => _isLoading = true);
+        String base64Image = '';
+        try {
+          if (_selectedImage != null) {
+            base64Image = await compute(convertFileToBase64, _selectedImage!);
+          }
 
-        if (fullname.isEmpty ||
-            username.isEmpty ||
-            email.isEmpty ||
-            password.isEmpty) {
-          throw Exception('All fields except profile picture are required');
-        }
+          // Trim whitespace from input
+          String fullname = _fullnameController.text.trim();
+          String username = _usernameController.text.trim();
+          String email = _emailController.text.trim();
+          String password = _passwordController.text.trim();
 
-        Map<String, dynamic> result = await Auth().registerWithEmailAndPassword(
-          fullname,
-          username,
-          email,
-          password,
-          base64Image,
-        );
-        setState(() => _isLoading = false);
+          if (fullname.isEmpty ||
+              username.isEmpty ||
+              email.isEmpty ||
+              password.isEmpty) {
+            throw Exception('All fields except profile picture are required');
+          }
 
-        if (result['success']) {
-          Navigator.pushReplacementNamed(context, '/home');
-        } else {
-          Fluttertoast.showToast(
-            msg: result['message'] ?? 'Registration failed. Please try again.',
-            toastLength: Toast.LENGTH_LONG,
-            gravity: ToastGravity.BOTTOM,
-            backgroundColor: AppColors.gradientMiddle,
-            textColor: Colors.white,
+          Map<String, dynamic> result =
+              await Auth().registerWithEmailAndPassword(
+            fullname,
+            username,
+            email,
+            password,
+            base64Image,
           );
+
+          setState(() => _isLoading = false);
+
+          if (result['success']) {
+            Navigator.pushReplacementNamed(context, '/home');
+          } else {
+            _showErrorToast(
+                result['message'] ?? 'Registration failed. Please try again.');
+          }
+        } catch (e) {
+          setState(() => _isLoading = false);
+          print('Error during registration: $e');
+          _showErrorToast('Registration failed: ${e.toString()}');
         }
-      } catch (e) {
-        setState(() => _isLoading = false);
-        print('Error during registration: $e');
-        Fluttertoast.showToast(
-          msg: 'Registration failed: ${e.toString()}',
-          toastLength: Toast.LENGTH_LONG,
-          gravity: ToastGravity.BOTTOM,
-          backgroundColor: AppColors.gradientMiddle,
-          textColor: Colors.white,
-        );
+      } else {
+        _showErrorToast('Please fill all required fields correctly');
       }
-    } else {
-      // Form is not valid, show a toast
-      Fluttertoast.showToast(
-        msg: 'Please fill all required fields correctly',
-        toastLength: Toast.LENGTH_LONG,
-        gravity: ToastGravity.BOTTOM,
-        backgroundColor: AppColors.gradientMiddle,
-        textColor: Colors.white,
-      );
-    }
+    });
+  }
+
+  void _showErrorToast(String message) {
+    Fluttertoast.showToast(
+      msg: message,
+      toastLength: Toast.LENGTH_LONG,
+      gravity: ToastGravity.BOTTOM,
+      backgroundColor: AppColors.gradientMiddle,
+      textColor: Colors.white,
+    );
   }
 
   void _selectProfilePicture() async {
     final picker = PickImage();
-    final File? selectedImage = await picker.pickImageFromGallery();
-    if (selectedImage != null) {
-      setState(() {
-        _selectedImage = selectedImage;
-      });
+    try {
+      final File? selectedImage =
+          (await picker.pickImageFromGallery()) as File?;
+      if (selectedImage != null) {
+        setState(() {
+          _selectedImage = selectedImage;
+        });
+      }
+    } catch (e) {
+      print('Error selecting image: $e');
+      _showErrorToast('Failed to select image. Please try again.');
     }
   }
 
@@ -174,6 +173,7 @@ class RegisterState extends State<Register> {
     _usernameController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
+    _debounceTimer?.cancel();
     super.dispose();
   }
 
