@@ -49,22 +49,45 @@ class RegisterState extends State<Register> {
   void _register() async {
     if (_formKey.currentState!.validate()) {
       setState(() => _isLoading = true);
-      final base64Image = await convertFileToBase64(_selectedImage!);
-      Map<String, dynamic> result = await Auth().registerWithEmailAndPassword(
-        _fullnameController.text,
-        _usernameController.text,
-        _emailController.text,
-        _passwordController.text,
-        base64Image,
-      );
-      setState(() => _isLoading = false);
+      String base64Image = '';
+      if (_selectedImage != null) {
+        base64Image = await convertFileToBase64(_selectedImage!);
+      }
+      try {
+        // Trim whitespace from input
+        String email = _emailController.text.trim();
+        String password = _passwordController.text.trim();
 
-      if (result['success']) {
-        Navigator.pushReplacementNamed(context, '/home');
-      } else {
+        if (email.isEmpty || password.isEmpty) {
+          throw Exception('Email and password cannot be empty');
+        }
+
+        Map<String, dynamic> result = await Auth().registerWithEmailAndPassword(
+          _fullnameController.text.trim(),
+          _usernameController.text.trim(),
+          email,
+          password,
+          base64Image,
+        );
+        setState(() => _isLoading = false);
+
+        if (result['success']) {
+          Navigator.pushReplacementNamed(context, '/home');
+        } else {
+          Fluttertoast.showToast(
+            msg: result['message'],
+            toastLength: Toast.LENGTH_LONG,
+            gravity: ToastGravity.BOTTOM,
+            backgroundColor: AppColors.gradientMiddle,
+            textColor: Colors.white,
+          );
+        }
+      } catch (e) {
+        setState(() => _isLoading = false);
+        print('Error during registration: $e');
         Fluttertoast.showToast(
-          msg: result['message'],
-          toastLength: Toast.LENGTH_SHORT,
+          msg: e.toString(),
+          toastLength: Toast.LENGTH_LONG,
           gravity: ToastGravity.BOTTOM,
           backgroundColor: AppColors.gradientMiddle,
           textColor: Colors.white,
@@ -266,8 +289,17 @@ class RegisterState extends State<Register> {
                                   CustomTextField(
                                     hintText: 'Email',
                                     onChanged: (value) => {},
-                                    validator: (value) =>
-                                        value!.isEmpty ? 'Enter email' : null,
+                                    validator: (value) {
+                                      if (value == null || value.isEmpty) {
+                                        return 'Please enter an email';
+                                      }
+                                      if (!RegExp(
+                                              r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$')
+                                          .hasMatch(value)) {
+                                        return 'Please enter a valid email';
+                                      }
+                                      return null;
+                                    },
                                     focusNode: _emailFocusNode,
                                     onFieldSubmitted: (_) {
                                       FocusScope.of(context)
@@ -281,9 +313,15 @@ class RegisterState extends State<Register> {
                                     hintText: 'Password',
                                     obscureText: _obscurePassword,
                                     onChanged: (value) => {},
-                                    validator: (value) => value!.isEmpty
-                                        ? 'Enter password'
-                                        : null,
+                                    validator: (value) {
+                                      if (value == null || value.isEmpty) {
+                                        return 'Please enter a password';
+                                      }
+                                      if (value.length < 6) {
+                                        return 'Password must be at least 6 characters long';
+                                      }
+                                      return null;
+                                    },
                                     focusNode: _passwordFocusNode,
                                     onFieldSubmitted: (_) => _register(),
                                     prefixIcon: Icons.lock,
