@@ -1,3 +1,5 @@
+import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:sycx_flutter_app/services/auth.dart';
 import 'package:fluttertoast/fluttertoast.dart';
@@ -29,6 +31,7 @@ class RegisterState extends State<Register> {
   File? _selectedImage;
   bool _obscurePassword = true;
   bool _isLoading = false;
+  Timer? _debounceTimer;
 
   void _refreshForm() {
     setState(() {
@@ -46,63 +49,82 @@ class RegisterState extends State<Register> {
     return Future.delayed(const Duration(seconds: 1));
   }
 
-  void _register() async {
-    if (_formKey.currentState!.validate()) {
-      setState(() => _isLoading = true);
-      String base64Image = '';
-      if (_selectedImage != null) {
-        base64Image = await convertFileToBase64(_selectedImage!);
-      }
-      try {
-        // Trim whitespace from input
-        String email = _emailController.text.trim();
-        String password = _passwordController.text.trim();
+  void _register() {
+    if (_debounceTimer?.isActive ?? false) return;
 
-        if (email.isEmpty || password.isEmpty) {
-          throw Exception('Email and password cannot be empty');
-        }
+    _debounceTimer = Timer(const Duration(milliseconds: 300), () async {
+      if (_formKey.currentState!.validate()) {
+        setState(() => _isLoading = true);
+        String base64Image = '';
+        try {
+          if (_selectedImage != null) {
+            base64Image = await compute(convertFileToBase64, _selectedImage!);
+          }
 
-        Map<String, dynamic> result = await Auth().registerWithEmailAndPassword(
-          _fullnameController.text.trim(),
-          _usernameController.text.trim(),
-          email,
-          password,
-          base64Image,
-        );
-        setState(() => _isLoading = false);
+          // Trim whitespace from input
+          String fullname = _fullnameController.text.trim();
+          String username = _usernameController.text.trim();
+          String email = _emailController.text.trim();
+          String password = _passwordController.text.trim();
 
-        if (result['success']) {
-          Navigator.pushReplacementNamed(context, '/home');
-        } else {
-          Fluttertoast.showToast(
-            msg: result['message'],
-            toastLength: Toast.LENGTH_LONG,
-            gravity: ToastGravity.BOTTOM,
-            backgroundColor: AppColors.gradientMiddle,
-            textColor: Colors.white,
+          if (fullname.isEmpty ||
+              username.isEmpty ||
+              email.isEmpty ||
+              password.isEmpty) {
+            throw Exception('All fields except profile picture are required');
+          }
+
+          Map<String, dynamic> result =
+              await Auth().registerWithEmailAndPassword(
+            fullname,
+            username,
+            email,
+            password,
+            base64Image,
           );
+
+          setState(() => _isLoading = false);
+
+          if (result['success']) {
+            Navigator.pushReplacementNamed(context, '/home');
+          } else {
+            _showErrorToast(
+                result['message'] ?? 'Registration failed. Please try again.');
+          }
+        } catch (e) {
+          setState(() => _isLoading = false);
+          print('Error during registration: $e');
+          _showErrorToast('Registration failed: ${e.toString()}');
         }
-      } catch (e) {
-        setState(() => _isLoading = false);
-        print('Error during registration: $e');
-        Fluttertoast.showToast(
-          msg: e.toString(),
-          toastLength: Toast.LENGTH_LONG,
-          gravity: ToastGravity.BOTTOM,
-          backgroundColor: AppColors.gradientMiddle,
-          textColor: Colors.white,
-        );
+      } else {
+        _showErrorToast('Please fill all required fields correctly');
       }
-    }
+    });
+  }
+
+  void _showErrorToast(String message) {
+    Fluttertoast.showToast(
+      msg: message,
+      toastLength: Toast.LENGTH_LONG,
+      gravity: ToastGravity.BOTTOM,
+      backgroundColor: AppColors.gradientMiddle,
+      textColor: Colors.white,
+    );
   }
 
   void _selectProfilePicture() async {
     final picker = PickImage();
-    final File? selectedImage = await picker.pickImageFromGallery();
-    if (selectedImage != null) {
-      setState(() {
-        _selectedImage = selectedImage;
-      });
+    try {
+      final File? selectedImage =
+          (await picker.pickImageFromGallery()) as File?;
+      if (selectedImage != null) {
+        setState(() {
+          _selectedImage = selectedImage;
+        });
+      }
+    } catch (e) {
+      print('Error selecting image: $e');
+      _showErrorToast('Failed to select image. Please try again.');
     }
   }
 
@@ -151,6 +173,7 @@ class RegisterState extends State<Register> {
     _usernameController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
+    _debounceTimer?.cancel();
     super.dispose();
   }
 
@@ -258,10 +281,13 @@ class RegisterState extends State<Register> {
                                   const SizedBox(height: 24),
                                   CustomTextField(
                                     hintText: 'Fullname',
-                                    onChanged: (value) => {},
-                                    validator: (value) => value!.isEmpty
-                                        ? 'Enter fullname'
-                                        : null,
+                                    validator: (value) {
+                                      if (value == null ||
+                                          value.trim().isEmpty) {
+                                        return 'Fullname is required';
+                                      }
+                                      return null;
+                                    },
                                     focusNode: _fullnameFocusNode,
                                     onFieldSubmitted: (_) {
                                       FocusScope.of(context)
@@ -273,10 +299,13 @@ class RegisterState extends State<Register> {
                                   const SizedBox(height: 16),
                                   CustomTextField(
                                     hintText: 'Username',
-                                    onChanged: (value) => {},
-                                    validator: (value) => value!.isEmpty
-                                        ? 'Enter username'
-                                        : null,
+                                    validator: (value) {
+                                      if (value == null ||
+                                          value.trim().isEmpty) {
+                                        return 'Username is required';
+                                      }
+                                      return null;
+                                    },
                                     focusNode: _usernameFocusNode,
                                     onFieldSubmitted: (_) {
                                       FocusScope.of(context)
@@ -288,15 +317,15 @@ class RegisterState extends State<Register> {
                                   const SizedBox(height: 16),
                                   CustomTextField(
                                     hintText: 'Email',
-                                    onChanged: (value) => {},
                                     validator: (value) {
-                                      if (value == null || value.isEmpty) {
-                                        return 'Please enter an email';
+                                      if (value == null ||
+                                          value.trim().isEmpty) {
+                                        return 'Email is required';
                                       }
                                       if (!RegExp(
                                               r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$')
                                           .hasMatch(value)) {
-                                        return 'Please enter a valid email';
+                                        return 'Please enter a valid email address';
                                       }
                                       return null;
                                     },
@@ -312,13 +341,18 @@ class RegisterState extends State<Register> {
                                   CustomTextField(
                                     hintText: 'Password',
                                     obscureText: _obscurePassword,
-                                    onChanged: (value) => {},
                                     validator: (value) {
-                                      if (value == null || value.isEmpty) {
-                                        return 'Please enter a password';
+                                      if (value == null ||
+                                          value.trim().isEmpty) {
+                                        return 'Password is required';
                                       }
-                                      if (value.length < 6) {
-                                        return 'Password must be at least 6 characters long';
+                                      if (value.length < 8) {
+                                        return 'Password must be at least 8 characters long';
+                                      }
+                                      if (!RegExp(
+                                              r'^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$')
+                                          .hasMatch(value)) {
+                                        return 'Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character';
                                       }
                                       return null;
                                     },

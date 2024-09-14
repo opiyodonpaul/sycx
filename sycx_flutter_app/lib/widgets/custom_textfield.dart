@@ -3,30 +3,32 @@ import 'package:sycx_flutter_app/utils/constants.dart';
 
 class CustomTextField extends StatelessWidget {
   final String hintText;
-  final Function(String) onChanged;
+  final Function(String)? onChanged;
   final bool obscureText;
   final String? Function(String?) validator;
   final FocusNode? focusNode;
   final Function(String)? onFieldSubmitted;
   final IconData? prefixIcon;
   final Widget? suffixIcon;
+  final TextEditingController controller;
 
   const CustomTextField({
     super.key,
     required this.hintText,
-    required this.onChanged,
+    this.onChanged,
     this.obscureText = false,
     required this.validator,
     this.focusNode,
     this.onFieldSubmitted,
     this.prefixIcon,
     this.suffixIcon,
-    required TextEditingController controller,
+    required this.controller,
   });
 
   @override
   Widget build(BuildContext context) {
     return TextFormField(
+      controller: controller,
       decoration: InputDecoration(
         hintText: hintText,
         hintStyle: AppTextStyles.bodyTextStyle.copyWith(
@@ -59,7 +61,6 @@ class CustomTextField extends StatelessWidget {
             ? Icon(prefixIcon, color: AppColors.secondaryTextColor)
             : null,
         suffixIcon: suffixIcon,
-        // Add a border to separate the input area from icons
         prefixIconConstraints: const BoxConstraints(minWidth: 60),
         suffixIconConstraints: const BoxConstraints(minWidth: 60),
       ),
