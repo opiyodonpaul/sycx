@@ -17,16 +17,26 @@ class Auth {
       String password,
       String userProfile) async {
     try {
+      // Input validation
+      if (email.isEmpty || password.isEmpty) {
+        return {
+          'success': false,
+          'message': 'Email and password cannot be empty.'
+        };
+      }
+
       // Check if username already exists
       final existingUser = await _database.getUserByUsername(userName);
       if (existingUser != null) {
         return {'success': false, 'message': 'This username is already taken.'};
       }
 
+      // Create the user in Firebase Auth
       UserCredential result = await _auth.createUserWithEmailAndPassword(
           email: email, password: password);
       User? user = result.user;
       if (user != null) {
+        // Create the user document in Firestore
         await _database.createUser(app_user.User(
           id: user.uid,
           fullName: fullName,
@@ -45,12 +55,17 @@ class Auth {
           'success': false,
           'message': 'An account with this email already exists.'
         };
+      } else if (e.code == 'invalid-email') {
+        return {'success': false, 'message': 'The email address is not valid.'};
+      } else if (e.code == 'weak-password') {
+        return {'success': false, 'message': 'The password is too weak.'};
       }
       return {
         'success': false,
         'message': e.message ?? 'An error occurred during registration.'
       };
     } catch (e) {
+      print('Unexpected error during registration: $e');
       return {'success': false, 'message': 'An unexpected error occurred.'};
     }
   }
@@ -107,6 +122,17 @@ class Auth {
             createdAt: DateTime.now(),
             updatedAt: DateTime.now(),
           ));
+        } else {
+          // User exists, update their information
+          await _database.updateUser(app_user.User(
+            id: user.uid,
+            fullName: user.displayName ?? existingUser.fullName,
+            userName: existingUser.userName,
+            email: user.email ?? existingUser.email,
+            userProfile: user.photoURL ?? existingUser.userProfile,
+            createdAt: existingUser.createdAt,
+            updatedAt: DateTime.now(),
+          ));
         }
         return {'success': true, 'user': user};
       }
@@ -119,7 +145,7 @@ class Auth {
     }
   }
 
-  // Apple Sign In
+// Apple Sign In
   Future<Map<String, dynamic>> signInWithApple() async {
     try {
       final credential = await SignInWithApple.getAppleIDCredential(
@@ -150,6 +176,17 @@ class Auth {
             email: user.email ?? '',
             userProfile: user.photoURL ?? '',
             createdAt: DateTime.now(),
+            updatedAt: DateTime.now(),
+          ));
+        } else {
+          // User exists, update their information
+          await _database.updateUser(app_user.User(
+            id: user.uid,
+            fullName: existingUser.fullName,
+            userName: existingUser.userName,
+            email: user.email ?? existingUser.email,
+            userProfile: user.photoURL ?? existingUser.userProfile,
+            createdAt: existingUser.createdAt,
             updatedAt: DateTime.now(),
           ));
         }
