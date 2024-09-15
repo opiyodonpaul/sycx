@@ -22,28 +22,85 @@ class ForgotPasswordState extends State<ForgotPassword> {
   void _resetPassword() async {
     if (_formKey.currentState!.validate()) {
       setState(() => _isLoading = true);
-      bool success =
-          (await Auth().sendPasswordResetEmail(_emailController.text)) as bool;
-      setState(() => _isLoading = false);
-      if (success) {
+
+      try {
+        Map<String, dynamic> result =
+            await Auth().sendPasswordResetEmail(_emailController.text);
+
+        if (result['success']) {
+          _showResetInstructionsDialog(context, result['expiration']);
+        } else {
+          Fluttertoast.showToast(
+            msg: result['message'],
+            toastLength: Toast.LENGTH_LONG,
+            gravity: ToastGravity.BOTTOM,
+            backgroundColor: AppColors.gradientMiddle,
+            textColor: Colors.white,
+          );
+        }
+      } catch (e) {
         Fluttertoast.showToast(
-          msg: "Password reset link sent to your email",
-          toastLength: Toast.LENGTH_SHORT,
+          msg: 'An unexpected error occurred: ${e.toString()}',
+          toastLength: Toast.LENGTH_LONG,
           gravity: ToastGravity.BOTTOM,
           backgroundColor: AppColors.gradientMiddle,
           textColor: Colors.white,
         );
-        Navigator.pushReplacementNamed(context, '/login');
-      } else {
-        Fluttertoast.showToast(
-          msg: "Failed to send password reset link",
-          toastLength: Toast.LENGTH_SHORT,
-          gravity: ToastGravity.BOTTOM,
-          backgroundColor: AppColors.gradientMiddle,
-          textColor: Colors.white,
-        );
+      } finally {
+        setState(() => _isLoading = false);
       }
     }
+  }
+
+  void _showResetInstructionsDialog(BuildContext context, String expiration) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          child: Container(
+            decoration: BoxDecoration(
+              color: AppColors.textFieldFillColor,
+              borderRadius: BorderRadius.circular(20),
+            ),
+            padding: const EdgeInsets.all(defaultPadding),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'Check Your Email',
+                  style: AppTextStyles.titleStyle
+                      .copyWith(color: AppColors.primaryTextColor),
+                ),
+                const SizedBox(height: defaultPadding),
+                Text(
+                  'We\'ve sent a password reset link to your email. Please check your inbox and follow the instructions to reset your password. '
+                  'The link will expire on $expiration UTC. If you don\'t see the email, please check your spam or junk folder as it might have been filtered there.',
+                  style: AppTextStyles.bodyTextStyle,
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: defaultPadding * 1.5),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primaryButtonColor,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(30),
+                    ),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 60, vertical: 12),
+                  ),
+                  child: Text('OK', style: AppTextStyles.buttonTextStyle),
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                    Navigator.pushReplacementNamed(context, '/login');
+                  },
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 
   Future<void> _handleRefresh() async {

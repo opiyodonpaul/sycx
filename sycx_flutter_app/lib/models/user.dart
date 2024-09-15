@@ -8,6 +8,8 @@ class User {
   final String userProfile;
   final DateTime createdAt;
   final DateTime updatedAt;
+  String? resetToken;
+  DateTime? resetTokenExpiration;
 
   User({
     required this.id,
@@ -17,6 +19,8 @@ class User {
     required this.userProfile,
     required this.createdAt,
     required this.updatedAt,
+    this.resetToken,
+    this.resetTokenExpiration,
   });
 
   factory User.fromFirestore(DocumentSnapshot doc) {
@@ -29,6 +33,10 @@ class User {
       userProfile: data['userProfile'] ?? '',
       createdAt: (data['createdAt'] as Timestamp).toDate(),
       updatedAt: (data['updatedAt'] as Timestamp).toDate(),
+      resetToken: data['resetToken'],
+      resetTokenExpiration: data['resetTokenExpiration'] != null
+          ? (data['resetTokenExpiration'] as Timestamp).toDate()
+          : null,
     );
   }
 
@@ -40,6 +48,10 @@ class User {
       'userProfile': userProfile,
       'createdAt': Timestamp.fromDate(createdAt),
       'updatedAt': Timestamp.fromDate(updatedAt),
+      'resetToken': resetToken,
+      'resetTokenExpiration': resetTokenExpiration != null
+          ? Timestamp.fromDate(resetTokenExpiration!)
+          : null,
     };
   }
 }

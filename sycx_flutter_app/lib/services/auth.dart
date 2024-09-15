@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:sign_in_with_apple/sign_in_with_apple.dart';
@@ -45,6 +47,8 @@ class Auth {
           userProfile: userProfile,
           createdAt: DateTime.now(),
           updatedAt: DateTime.now(),
+          resetToken: null,
+          resetTokenExpiration: null,
         ));
         return {'success': true, 'user': user};
       }
@@ -70,7 +74,7 @@ class Auth {
     }
   }
 
-  // Email & Password Sign In
+  // Username & Password Sign In (with email linking)
   Future<Map<String, dynamic>> signInWithEmailAndPassword(
       String usernameOrEmail, String password) async {
     try {
@@ -121,6 +125,8 @@ class Auth {
             userProfile: user.photoURL ?? '',
             createdAt: DateTime.now(),
             updatedAt: DateTime.now(),
+            resetToken: null,
+            resetTokenExpiration: null,
           ));
         } else {
           // User exists, update their information
@@ -132,6 +138,8 @@ class Auth {
             userProfile: user.photoURL ?? existingUser.userProfile,
             createdAt: existingUser.createdAt,
             updatedAt: DateTime.now(),
+            resetToken: existingUser.resetToken,
+            resetTokenExpiration: existingUser.resetTokenExpiration,
           ));
         }
         return {'success': true, 'user': user};
@@ -177,6 +185,8 @@ class Auth {
             userProfile: user.photoURL ?? '',
             createdAt: DateTime.now(),
             updatedAt: DateTime.now(),
+            resetToken: null,
+            resetTokenExpiration: null,
           ));
         } else {
           // User exists, update their information
@@ -188,6 +198,8 @@ class Auth {
             userProfile: user.photoURL ?? existingUser.userProfile,
             createdAt: existingUser.createdAt,
             updatedAt: DateTime.now(),
+            resetToken: existingUser.resetToken,
+            resetTokenExpiration: existingUser.resetTokenExpiration,
           ));
         }
         return {'success': true, 'user': user};
@@ -222,28 +234,54 @@ class Auth {
     return await _auth.signOut();
   }
 
+  // Generate a random token
+  String _generateToken() {
+    const chars =
+        'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    Random rnd = Random.secure();
+    return List.generate(32, (index) => chars[rnd.nextInt(chars.length)])
+        .join();
+  }
+
   // Password Reset
   Future<Map<String, dynamic>> sendPasswordResetEmail(String email) async {
     try {
+      // Check if user exists
+      app_user.User? user = await _database.getUserByEmail(email);
+      if (user == null) {
+        return {'success': false, 'message': 'No user found with this email.'};
+      }
+
+      // Generate token and set expiration
+      String token = _generateToken();
+      DateTime expiration = DateTime.now().add(const Duration(hours: 1));
+
+      // Save token to database
+      await _database.setResetToken(user.id, token, expiration);
+
+      // Send email
       await _auth.sendPasswordResetEmail(
         email: email,
         actionCodeSettings: ActionCodeSettings(
-          url: 'https://sycx-reset-password-59c81.web.app',
+          url: 'https://sycx-e17d1.web.app/?token=$token',
           handleCodeInApp: true,
           androidPackageName: 'com.donartkins.sycx',
           androidInstallApp: true,
           androidMinimumVersion: '12',
           iOSBundleId: 'com.donartkins.sycx',
+          dynamicLinkDomain: 'sycx.page.link',
         ),
       );
+
       return {
         'success': true,
-        'message': 'Password reset email sent successfully.'
+        'message': 'Password reset email sent successfully.',
+        'expiration': expiration.toUtc().toString(),
       };
     } catch (e) {
       return {
         'success': false,
-        'message': 'Failed to send password reset email.'
+        'message': 'An unexpected error occurred: ${e.toString()}'
       };
     }
   }
