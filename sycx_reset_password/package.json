@@ -1,5 +1,5 @@
 {
-  "name": "sycx_rest_password",
+  "name": "sycx_reset_password",
   "version": "1.0.0",
   "main": "build.js",
   "scripts": {

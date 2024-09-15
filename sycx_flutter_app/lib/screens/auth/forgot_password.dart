@@ -28,7 +28,7 @@ class ForgotPasswordState extends State<ForgotPassword> {
             await Auth().sendPasswordResetEmail(_emailController.text);
 
         if (result['success']) {
-          _showResetInstructionsDialog(result['expiration']);
+          _showResetInstructionsDialog(context, result['expiration']);
         } else {
           Fluttertoast.showToast(
             msg: result['message'],
@@ -52,24 +52,52 @@ class ForgotPasswordState extends State<ForgotPassword> {
     }
   }
 
-  void _showResetInstructionsDialog(String expiration) {
+  void _showResetInstructionsDialog(BuildContext context, String expiration) {
     showDialog(
       context: context,
       builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text('Check Your Email'),
-          content: Text(
-              'We\'ve sent a password reset link to your email. Please check your inbox and follow the instructions to reset your password. '
-              'The link will expire on $expiration UTC. If you don\'t see the email, please check your spam or junk folder as it might have been filtered there.'),
-          actions: <Widget>[
-            TextButton(
-              child: const Text('OK'),
-              onPressed: () {
-                Navigator.of(context).pop();
-                Navigator.pushReplacementNamed(context, '/login');
-              },
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          child: Container(
+            decoration: BoxDecoration(
+              color: AppColors.textFieldFillColor,
+              borderRadius: BorderRadius.circular(20),
             ),
-          ],
+            padding: const EdgeInsets.all(defaultPadding),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'Check Your Email',
+                  style: AppTextStyles.titleStyle
+                      .copyWith(color: AppColors.primaryTextColor),
+                ),
+                const SizedBox(height: defaultPadding),
+                Text(
+                  'We\'ve sent a password reset link to your email. Please check your inbox and follow the instructions to reset your password. '
+                  'The link will expire on $expiration UTC. If you don\'t see the email, please check your spam or junk folder as it might have been filtered there.',
+                  style: AppTextStyles.bodyTextStyle,
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: defaultPadding * 1.5),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primaryButtonColor,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(30),
+                    ),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 60, vertical: 12),
+                  ),
+                  child: Text('OK', style: AppTextStyles.buttonTextStyle),
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                    Navigator.pushReplacementNamed(context, '/login');
+                  },
+                ),
+              ],
+            ),
+          ),
         );
       },
     );

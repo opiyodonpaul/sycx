@@ -235,15 +235,16 @@
         projectId: "$FIREBASE_PROJECT_ID",
         storageBucket: "$FIREBASE_STORAGE_BUCKET",
         messagingSenderId: "$FIREBASE_MESSAGING_SENDER_ID",
-        appId: "$FIREBASE_APP_ID"
+        appId: "$FIREBASE_APP_ID",
+        measurementId: "$FIREBASE_MEASUREMENT_ID",
       };
       firebase.initializeApp(firebaseConfig);
 
       // Check for token on page load
       document.addEventListener("DOMContentLoaded", function () {
         const urlParams = new URLSearchParams(window.location.search);
-        const token = urlParams.get("token");
-        if (!token) {
+        const oobCode = urlParams.get("oobCode");
+        if (!oobCode) {
           showToast(
             "Invalid or missing token. Please use the link provided in your email.",
             "error"
@@ -269,6 +270,7 @@
         const confirmPassword =
           document.getElementById("confirm-password").value;
 
+        // Password validation
         if (newPassword !== confirmPassword) {
           showToast("Passwords do not match!", "error");
           return;
@@ -279,13 +281,36 @@
           return;
         }
 
-        const actionCode = new URLSearchParams(window.location.search).get(
-          "oobCode"
-        );
+        // Additional password strength check
+        const passwordStrength = checkPasswordStrength(newPassword);
+        if (passwordStrength !== "strong") {
+          showToast(
+            "Password is not strong enough. Please include a mix of uppercase and lowercase letters, numbers, and special characters.",
+            "error"
+          );
+          return;
+        }
+
+        const urlParams = new URLSearchParams(window.location.search);
+        const oobCode = urlParams.get("oobCode");
+
+        if (!oobCode) {
+          showToast(
+            "Invalid or missing reset code. Please use the link provided in your email.",
+            "error"
+          );
+          return;
+        }
+
+        // Disable the reset button to prevent multiple submissions
+        document.querySelector(".button").disabled = true;
 
         firebase
           .auth()
-          .confirmPasswordReset(actionCode, newPassword)
+          .verifyPasswordResetCode(oobCode)
+          .then(() => {
+            return firebase.auth().confirmPasswordReset(oobCode, newPassword);
+          })
           .then(() => {
             showToast("Password reset successful!", "success");
             setTimeout(() => {
@@ -295,15 +320,22 @@
           .catch((error) => {
             console.error("Error:", error);
             showToast(`Error: ${error.message}`, "error");
+            // Re-enable the reset button on error
+            document.querySelector(".button").disabled = false;
           });
+      }
+
+      function checkPasswordStrength(password) {
+        const strongRegex = new RegExp(
+          "^(?=.*[a-z])(?=.*[A-Z])(?=.*[0-9])(?=.*[!@#$%^&*])(?=.{8,})"
+        );
+        return strongRegex.test(password) ? "strong" : "weak";
       }
 
       function showToast(message, type) {
         const toast = document.createElement("div");
         toast.className = "toast";
-        toast.innerHTML = `
-                ${message}
-            `;
+        toast.innerHTML = `${message}`;
 
         document.getElementById("toast-container").appendChild(toast);
 

@@ -263,7 +263,7 @@ class Auth {
       await _auth.sendPasswordResetEmail(
         email: email,
         actionCodeSettings: ActionCodeSettings(
-          url: 'https://sycx-reset-password-59c81.web.app?token=$token',
+          url: 'https://sycx-e17d1.web.app/?token=$token',
           handleCodeInApp: true,
           androidPackageName: 'com.donartkins.sycx',
           androidInstallApp: true,
@@ -277,60 +277,6 @@ class Auth {
         'success': true,
         'message': 'Password reset email sent successfully.',
         'expiration': expiration.toUtc().toString(),
-      };
-    } catch (e) {
-      return {
-        'success': false,
-        'message': 'An unexpected error occurred: ${e.toString()}'
-      };
-    }
-  }
-
-  // Verify Reset Token
-  Future<Map<String, dynamic>> verifyResetToken(String token) async {
-    try {
-      app_user.User? user = await _database.getUserByResetToken(token);
-      if (user == null) {
-        return {'success': false, 'message': 'Invalid reset token.'};
-      }
-
-      if (user.resetTokenExpiration!.isBefore(DateTime.now())) {
-        await _database.clearResetToken(user.id);
-        return {'success': false, 'message': 'Reset token has expired.'};
-      }
-
-      return {'success': true, 'message': 'Token is valid.'};
-    } catch (e) {
-      return {
-        'success': false,
-        'message': 'An unexpected error occurred: ${e.toString()}'
-      };
-    }
-  }
-
-  // Reset Password
-  Future<Map<String, dynamic>> resetPassword(
-      String token, String newPassword) async {
-    try {
-      app_user.User? user = await _database.getUserByResetToken(token);
-      if (user == null) {
-        return {'success': false, 'message': 'Invalid reset token.'};
-      }
-
-      if (user.resetTokenExpiration!.isBefore(DateTime.now())) {
-        await _database.clearResetToken(user.id);
-        return {'success': false, 'message': 'Reset token has expired.'};
-      }
-
-      // Reset the password
-      await _auth.confirmPasswordReset(code: token, newPassword: newPassword);
-
-      // Clear the reset token
-      await _database.clearResetToken(user.id);
-
-      return {
-        'success': true,
-        'message': 'Password has been reset successfully.'
       };
     } catch (e) {
       return {
