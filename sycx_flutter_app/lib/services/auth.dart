@@ -70,7 +70,7 @@ class Auth {
     }
   }
 
-  // Email & Password Sign In
+  // Username & Password Sign In (with email linking)
   Future<Map<String, dynamic>> signInWithEmailAndPassword(
       String usernameOrEmail, String password) async {
     try {
@@ -234,16 +234,22 @@ class Auth {
           androidInstallApp: true,
           androidMinimumVersion: '12',
           iOSBundleId: 'com.donartkins.sycx',
+          dynamicLinkDomain: 'sycx.page.link',
         ),
       );
       return {
         'success': true,
         'message': 'Password reset email sent successfully.'
       };
+    } on FirebaseAuthException catch (e) {
+      return {
+        'success': false,
+        'message': e.message ?? 'Failed to send password reset email.'
+      };
     } catch (e) {
       return {
         'success': false,
-        'message': 'Failed to send password reset email.'
+        'message': 'An unexpected error occurred: ${e.toString()}'
       };
     }
   }

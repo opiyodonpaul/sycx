@@ -22,26 +22,32 @@ class ForgotPasswordState extends State<ForgotPassword> {
   void _resetPassword() async {
     if (_formKey.currentState!.validate()) {
       setState(() => _isLoading = true);
-      bool success =
-          (await Auth().sendPasswordResetEmail(_emailController.text)) as bool;
-      setState(() => _isLoading = false);
-      if (success) {
+
+      try {
+        Map<String, dynamic> result =
+            await Auth().sendPasswordResetEmail(_emailController.text);
+
         Fluttertoast.showToast(
-          msg: "Password reset link sent to your email",
-          toastLength: Toast.LENGTH_SHORT,
+          msg: result['message'],
+          toastLength: Toast.LENGTH_LONG,
           gravity: ToastGravity.BOTTOM,
           backgroundColor: AppColors.gradientMiddle,
           textColor: Colors.white,
         );
-        Navigator.pushReplacementNamed(context, '/login');
-      } else {
+
+        if (result['success']) {
+          Navigator.pushReplacementNamed(context, '/login');
+        }
+      } catch (e) {
         Fluttertoast.showToast(
-          msg: "Failed to send password reset link",
-          toastLength: Toast.LENGTH_SHORT,
+          msg: 'An unexpected error occurred: ${e.toString()}',
+          toastLength: Toast.LENGTH_LONG,
           gravity: ToastGravity.BOTTOM,
           backgroundColor: AppColors.gradientMiddle,
           textColor: Colors.white,
         );
+      } finally {
+        setState(() => _isLoading = false);
       }
     }
   }
