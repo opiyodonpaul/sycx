@@ -27,16 +27,16 @@ class ForgotPasswordState extends State<ForgotPassword> {
         Map<String, dynamic> result =
             await Auth().sendPasswordResetEmail(_emailController.text);
 
-        Fluttertoast.showToast(
-          msg: result['message'],
-          toastLength: Toast.LENGTH_LONG,
-          gravity: ToastGravity.BOTTOM,
-          backgroundColor: AppColors.gradientMiddle,
-          textColor: Colors.white,
-        );
-
         if (result['success']) {
-          Navigator.pushReplacementNamed(context, '/login');
+          _showResetInstructionsDialog(result['expiration']);
+        } else {
+          Fluttertoast.showToast(
+            msg: result['message'],
+            toastLength: Toast.LENGTH_LONG,
+            gravity: ToastGravity.BOTTOM,
+            backgroundColor: AppColors.gradientMiddle,
+            textColor: Colors.white,
+          );
         }
       } catch (e) {
         Fluttertoast.showToast(
@@ -50,6 +50,29 @@ class ForgotPasswordState extends State<ForgotPassword> {
         setState(() => _isLoading = false);
       }
     }
+  }
+
+  void _showResetInstructionsDialog(String expiration) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Check Your Email'),
+          content: Text(
+              'We\'ve sent a password reset link to your email. Please check your inbox and follow the instructions to reset your password. '
+              'The link will expire on $expiration UTC. If you don\'t see the email, please check your spam or junk folder as it might have been filtered there.'),
+          actions: <Widget>[
+            TextButton(
+              child: const Text('OK'),
+              onPressed: () {
+                Navigator.of(context).pop();
+                Navigator.pushReplacementNamed(context, '/login');
+              },
+            ),
+          ],
+        );
+      },
+    );
   }
 
   Future<void> _handleRefresh() async {

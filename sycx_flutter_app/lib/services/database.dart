@@ -37,6 +37,47 @@ class Database {
         .update(user.toFirestore());
   }
 
+  Future<void> setResetToken(
+      String userId, String token, DateTime expiration) async {
+    await _firestore.collection('users').doc(userId).update({
+      'resetToken': token,
+      'resetTokenExpiration': Timestamp.fromDate(expiration),
+    });
+  }
+
+  Future<void> clearResetToken(String userId) async {
+    await _firestore.collection('users').doc(userId).update({
+      'resetToken': FieldValue.delete(),
+      'resetTokenExpiration': FieldValue.delete(),
+    });
+  }
+
+  Future<User?> getUserByEmail(String email) async {
+    QuerySnapshot querySnapshot = await _firestore
+        .collection('users')
+        .where('email', isEqualTo: email)
+        .limit(1)
+        .get();
+
+    if (querySnapshot.docs.isNotEmpty) {
+      return User.fromFirestore(querySnapshot.docs.first);
+    }
+    return null;
+  }
+
+  Future<User?> getUserByResetToken(String token) async {
+    QuerySnapshot querySnapshot = await _firestore
+        .collection('users')
+        .where('resetToken', isEqualTo: token)
+        .limit(1)
+        .get();
+
+    if (querySnapshot.docs.isNotEmpty) {
+      return User.fromFirestore(querySnapshot.docs.first);
+    }
+    return null;
+  }
+
   // Summary operations
   Future<void> createSummary(Summary summary) async {
     await _firestore.collection('summaries').add(summary.toFirestore());
