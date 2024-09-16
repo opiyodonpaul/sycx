@@ -13,6 +13,7 @@ class Auth {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final GoogleSignIn _googleSignIn = GoogleSignIn();
   final Database _database = Database();
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
   // Email & Password Sign Up
   Future<Map<String, dynamic>> registerWithEmailAndPassword(
@@ -72,7 +73,6 @@ class Auth {
         'message': e.message ?? 'An error occurred during registration.'
       };
     } catch (e) {
-      print('Unexpected error during registration: $e');
       return {'success': false, 'message': 'An unexpected error occurred.'};
     }
   }
@@ -226,7 +226,6 @@ class Auth {
         throw Exception('User not found');
       }
     } catch (e) {
-      print('Error getting user email: $e');
       rethrow;
     }
   }
@@ -301,9 +300,8 @@ class Auth {
           networkType: NetworkType.connected,
         ),
       );
-      print('Token expiration task initialized successfully');
     } catch (e) {
-      print('Error initializing token expiration task: $e');
+      //
     }
   }
 
@@ -311,13 +309,11 @@ class Auth {
   @pragma('vm:entry-point')
   static void callbackDispatcher() {
     Workmanager().executeTask((task, inputData) async {
-      print('Executing background task: $task');
       if (task == 'clearExpiredResetTokens') {
         try {
           await _clearExpiredResetTokens();
-          print('Expired reset tokens cleared successfully');
         } catch (e) {
-          print('Error clearing expired reset tokens: $e');
+          //
         }
       }
       return Future.value(true);
@@ -326,7 +322,6 @@ class Auth {
 
   // Clear expired reset tokens
   static Future<void> _clearExpiredResetTokens() async {
-    print('Starting to clear expired reset tokens');
     final firestore = FirebaseFirestore.instance;
     final now = Timestamp.now();
 
@@ -335,8 +330,6 @@ class Auth {
           .collection('users')
           .where('resetTokenExpiration', isLessThan: now)
           .get();
-
-      print('Found ${snapshot.size} expired reset tokens');
 
       final batch = firestore.batch();
       for (var doc in snapshot.docs) {
@@ -347,9 +340,7 @@ class Auth {
       }
 
       await batch.commit();
-      print('Cleared ${snapshot.size} expired reset tokens');
     } catch (e) {
-      print('Error in _clearExpiredResetTokens: $e');
       if (kDebugMode) {
         print(e.toString());
       }
@@ -358,17 +349,32 @@ class Auth {
 
   // Manually clear expired reset tokens (for testing or on-demand use)
   static Future<void> clearExpiredResetTokensManually() async {
-    print('Manually clearing expired reset tokens');
     try {
       await _clearExpiredResetTokens();
-      print('Manual clearing of expired reset tokens completed');
     } catch (e) {
-      print('Error in manual clearing of expired reset tokens: $e');
+      //
     }
   }
 
   // Get Current User
   User? getCurrentUser() {
     return _auth.currentUser;
+  }
+
+  // Add a stream of the user's authentication state
+  Stream<User?> get authStateChanges => _auth.authStateChanges();
+
+  // Stream of the current user's data
+  Stream<Stream<app_user.User>?> get userDataStream {
+    return _auth.authStateChanges().asyncMap((User? user) {
+      if (user == null) {
+        return null;
+      }
+      return _firestore
+          .collection('users')
+          .doc(user.uid)
+          .snapshots()
+          .map((snapshot) => app_user.User.fromFirestore(snapshot));
+    }).asBroadcastStream();
   }
 }
