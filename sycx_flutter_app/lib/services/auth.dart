@@ -1,10 +1,13 @@
+import 'dart:async';
 import 'dart:math';
-
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 import 'package:sycx_flutter_app/services/database.dart';
 import 'package:sycx_flutter_app/models/user.dart' as app_user;
+import 'package:workmanager/workmanager.dart';
 
 class Auth {
   final FirebaseAuth _auth = FirebaseAuth.instance;
@@ -254,7 +257,7 @@ class Auth {
 
       // Generate token and set expiration
       String token = _generateToken();
-      DateTime expiration = DateTime.now().add(const Duration(hours: 1));
+      DateTime expiration = DateTime.now().add(const Duration(minutes: 10));
 
       // Save token to database
       await _database.setResetToken(user.id, token, expiration);
@@ -283,6 +286,84 @@ class Auth {
         'success': false,
         'message': 'An unexpected error occurred: ${e.toString()}'
       };
+    }
+  }
+
+  // Initialize background task for token expiration
+  static Future<void> initializeTokenExpirationTask() async {
+    try {
+      await Workmanager().initialize(callbackDispatcher);
+      await Workmanager().registerPeriodicTask(
+        'tokenExpirationTask',
+        'clearExpiredResetTokens',
+        frequency: const Duration(minutes: 15),
+        constraints: Constraints(
+          networkType: NetworkType.connected,
+        ),
+      );
+      print('Token expiration task initialized successfully');
+    } catch (e) {
+      print('Error initializing token expiration task: $e');
+    }
+  }
+
+  // Callback dispatcher for background task
+  @pragma('vm:entry-point')
+  static void callbackDispatcher() {
+    Workmanager().executeTask((task, inputData) async {
+      print('Executing background task: $task');
+      if (task == 'clearExpiredResetTokens') {
+        try {
+          await _clearExpiredResetTokens();
+          print('Expired reset tokens cleared successfully');
+        } catch (e) {
+          print('Error clearing expired reset tokens: $e');
+        }
+      }
+      return Future.value(true);
+    });
+  }
+
+  // Clear expired reset tokens
+  static Future<void> _clearExpiredResetTokens() async {
+    print('Starting to clear expired reset tokens');
+    final firestore = FirebaseFirestore.instance;
+    final now = Timestamp.now();
+
+    try {
+      final snapshot = await firestore
+          .collection('users')
+          .where('resetTokenExpiration', isLessThan: now)
+          .get();
+
+      print('Found ${snapshot.size} expired reset tokens');
+
+      final batch = firestore.batch();
+      for (var doc in snapshot.docs) {
+        batch.update(doc.reference, {
+          'resetToken': FieldValue.delete(),
+          'resetTokenExpiration': FieldValue.delete(),
+        });
+      }
+
+      await batch.commit();
+      print('Cleared ${snapshot.size} expired reset tokens');
+    } catch (e) {
+      print('Error in _clearExpiredResetTokens: $e');
+      if (kDebugMode) {
+        print(e.toString());
+      }
+    }
+  }
+
+  // Manually clear expired reset tokens (for testing or on-demand use)
+  static Future<void> clearExpiredResetTokensManually() async {
+    print('Manually clearing expired reset tokens');
+    try {
+      await _clearExpiredResetTokens();
+      print('Manual clearing of expired reset tokens completed');
+    } catch (e) {
+      print('Error in manual clearing of expired reset tokens: $e');
     }
   }
 

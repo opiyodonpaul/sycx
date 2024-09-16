@@ -24,12 +24,26 @@ import 'package:sycx_flutter_app/screens/view_summary.dart';
 import 'package:sycx_flutter_app/screens/welcome.dart';
 import 'package:sycx_flutter_app/screens/home.dart';
 import 'package:sycx_flutter_app/screens/your_data.dart';
+import 'package:sycx_flutter_app/services/auth.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
+  try {
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+    print('Firebase initialized successfully');
+  } catch (e) {
+    print('Error initializing Firebase: $e');
+  }
+
+  try {
+    await Auth.initializeTokenExpirationTask();
+    print('Token expiration task initialized successfully');
+  } catch (e) {
+    print('Error initializing token expiration task: $e');
+  }
+
   runApp(const MyApp());
 }
 
