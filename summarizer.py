@@ -174,12 +174,7 @@ def insert_visuals_into_summary(summary, images):
             enriched_paragraphs.append(f'\n![Image]({images[i]})\n')
     return '\n\n'.join(enriched_paragraphs)
 
-def save_feedback(summary_id, user_id, feedback_text, summaries_collection, model):
-    summaries_collection.update_one(
-        {"_id": summary_id, "user_id": user_id},
-        {"$push": {"feedback": feedback_text}}
-    )
-    
+def feedback_improve_model(summary_id, user_id, feedback_text, summaries_collection, model):
     # Retrieve the original summary and document content
     summary_data = summaries_collection.find_one({"_id": summary_id})
     if summary_data:
@@ -188,30 +183,3 @@ def save_feedback(summary_id, user_id, feedback_text, summaries_collection, mode
         
         # Use the feedback to improve the model
         model.improve_model(original_content, original_summary, feedback_text)
-
-def retrieve_summary(summary_id, summaries_collection):
-    summary_data = summaries_collection.find_one({"_id": summary_id})
-    if summary_data:
-        return summary_data['summary']
-    else:
-        return "Summary not found"
-
-def delete_summary(summary_id, user_id, summaries_collection):
-    result = summaries_collection.delete_one({"_id": summary_id, "user_id": user_id})
-    return result.deleted_count > 0
-
-def download_summary_file(summary_id, file_format, summaries_collection):
-    summary_data = summaries_collection.find_one({"_id": summary_id})
-    if summary_data:
-        summary_text = summary_data['summary']
-        if file_format == 'txt':
-            return summary_text, 'text/plain'
-        elif file_format == 'md':
-            return summary_text, 'text/markdown'
-        elif file_format == 'html':
-            html_content = f"<html><body>{summary_text}</body></html>"
-            return html_content, 'text/html'
-        else:
-            return "Unsupported format", 'text/plain'
-    else:
-        return "Summary not found", 'text/plain'
