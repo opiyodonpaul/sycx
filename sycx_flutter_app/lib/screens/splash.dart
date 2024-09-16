@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:sycx_flutter_app/utils/secure_storage.dart';
+import 'package:sycx_flutter_app/services/auth.dart';
 import 'package:sycx_flutter_app/utils/constants.dart';
 
 class Splash extends StatefulWidget {
@@ -12,6 +12,7 @@ class Splash extends StatefulWidget {
 class SplashState extends State<Splash> with SingleTickerProviderStateMixin {
   late AnimationController _animationController;
   late Animation<double> _opacityAnimation;
+  final Auth _auth = Auth();
 
   @override
   void initState() {
@@ -24,24 +25,31 @@ class SplashState extends State<Splash> with SingleTickerProviderStateMixin {
       CurvedAnimation(parent: _animationController, curve: Curves.easeIn),
     );
     _animationController.forward();
-    _checkAuthState();
+    _listenToAuthState();
+  }
+
+  void _listenToAuthState() {
+    _auth.authStateChanges.listen((user) {
+      if (user != null) {
+        _navigateToHome();
+      } else {
+        _navigateToWelcome();
+      }
+    });
+  }
+
+  void _navigateToHome() {
+    Navigator.of(context).pushReplacementNamed('/home');
+  }
+
+  void _navigateToWelcome() {
+    Navigator.of(context).pushReplacementNamed('/welcome');
   }
 
   @override
   void dispose() {
     _animationController.dispose();
     super.dispose();
-  }
-
-  Future<void> _checkAuthState() async {
-    await Future.delayed(const Duration(seconds: 8));
-    if (!mounted) return;
-    final token = await SecureStorage.getToken();
-    if (token != null) {
-      Navigator.pushReplacementNamed(context, '/home');
-    } else {
-      Navigator.pushReplacementNamed(context, '/welcome');
-    }
   }
 
   @override
