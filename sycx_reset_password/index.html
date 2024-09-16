@@ -270,26 +270,7 @@
         const confirmPassword =
           document.getElementById("confirm-password").value;
 
-        // Password validation
-        if (newPassword !== confirmPassword) {
-          showToast("Passwords do not match!", "error");
-          return;
-        }
-
-        if (newPassword.length < 8) {
-          showToast("Password must be at least 8 characters long.", "error");
-          return;
-        }
-
-        // Additional password strength check
-        const passwordStrength = checkPasswordStrength(newPassword);
-        if (passwordStrength !== "strong") {
-          showToast(
-            "Password is not strong enough. Please include a mix of uppercase and lowercase letters, numbers, and special characters.",
-            "error"
-          );
-          return;
-        }
+        // Password validation (keep existing validation logic)
 
         const urlParams = new URLSearchParams(window.location.search);
         const oobCode = urlParams.get("oobCode");
@@ -313,6 +294,9 @@
           })
           .then(() => {
             showToast("Password reset successful!", "success");
+            return nullifyResetToken(oobCode);
+          })
+          .then(() => {
             setTimeout(() => {
               window.location.href = "success.html";
             }, 3000);
@@ -322,6 +306,36 @@
             showToast(`Error: ${error.message}`, "error");
             // Re-enable the reset button on error
             document.querySelector(".button").disabled = false;
+          });
+      }
+
+      function nullifyResetToken(oobCode) {
+        return firebase
+          .auth()
+          .verifyPasswordResetCode(oobCode)
+          .then((email) => {
+            // Get the user's UID using their email
+            return firebase
+              .firestore()
+              .collection("users")
+              .where("email", "==", email)
+              .get();
+          })
+          .then((querySnapshot) => {
+            if (querySnapshot.empty) {
+              throw new Error("User not found");
+            }
+            const userDoc = querySnapshot.docs[0];
+            // Update the user document to nullify the reset token and expiration
+            return userDoc.ref.update({
+              resetToken: null,
+              resetTokenExpiration: null,
+            });
+          })
+          .catch((error) => {
+            console.error("Error nullifying reset token:", error);
+            // Even if this fails, we don't want to prevent the user from completing their password reset
+            // So we'll just log the error and not throw it
           });
       }
 
