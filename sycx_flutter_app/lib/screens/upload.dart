@@ -1,9 +1,10 @@
+import 'dart:async';
 import 'dart:io';
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:sycx_flutter_app/dummy_data.dart';
-import 'package:sycx_flutter_app/services/summary.dart';
 import 'package:sycx_flutter_app/utils/constants.dart';
 import 'package:sycx_flutter_app/widgets/animated_button.dart';
 import 'package:sycx_flutter_app/widgets/custom_app_bar.dart';
@@ -26,19 +27,20 @@ class UploadState extends State<Upload> with TickerProviderStateMixin {
   late AnimationController _loadingAnimationController;
   late AnimationController _deleteAnimationController;
   double _progress = 0.0;
-  int _currentFileIndex = 0;
   String _selectedLanguage = 'English';
   final List<String> _languages = [
     'English',
+    'Swahili',
     'Spanish',
     'French',
     'German',
-    'Chinese'
   ];
-  String _currentStep = '';
+  String _currentStepName = '';
   PlatformFile? _previewFile;
   bool _mergeSummaries = false;
   String? _filePreviewContent;
+  int _totalSteps = 0;
+  int _currentStep = 0;
 
   @override
   void initState() {
@@ -103,41 +105,39 @@ class UploadState extends State<Upload> with TickerProviderStateMixin {
 
     setState(() {
       _progress = 0.0;
-      _currentFileIndex = 0;
       isLoading = true;
+      _totalSteps =
+          _mergeSummaries ? uploadedFiles.length + 1 : uploadedFiles.length;
+      _currentStep = 0;
     });
     _loadingAnimationController.forward();
 
     try {
-      const userId = 'artkins10';
-
       if (_mergeSummaries) {
-        // Merge all files into one summary
-        await SummaryService.summarizeDocument(
-          userId,
-          uploadedFiles,
-          (progress) {
-            setState(() {
-              _progress = progress;
-              _currentStep = _getStepName(progress);
-            });
-          },
-        );
+        // Merging process
+        for (var i = 0; i < uploadedFiles.length; i++) {
+          setState(() {
+            _currentStep = i + 1;
+            _currentStepName = 'Merging file ${i + 1}/${uploadedFiles.length}';
+          });
+          await _simulateMerging(uploadedFiles[i]);
+        }
+
+        // Summarize merged document
+        setState(() {
+          _currentStep = uploadedFiles.length + 1;
+          _currentStepName = 'Summarizing merged document';
+        });
+        await _simulateSummarization(null, true);
       } else {
         // Summarize each file individually
         for (var i = 0; i < uploadedFiles.length; i++) {
-          final file = uploadedFiles[i];
-          await SummaryService.summarizeDocument(
-            userId,
-            file,
-            (progress) {
-              setState(() {
-                _progress = (i + progress) / uploadedFiles.length;
-                _currentFileIndex = i;
-                _currentStep = _getStepName(progress);
-              });
-            },
-          );
+          setState(() {
+            _currentStep = i + 1;
+            _currentStepName =
+                'Summarizing file ${i + 1}/${uploadedFiles.length}';
+          });
+          await _simulateSummarization(uploadedFiles[i], false);
         }
       }
 
@@ -162,13 +162,28 @@ class UploadState extends State<Upload> with TickerProviderStateMixin {
     }
   }
 
-  String _getStepName(double progress) {
-    if (progress < 0.33) {
-      return "Analyzing Content";
-    } else if (progress < 0.66) {
-      return "Extracting Key Points";
-    } else {
-      return "Generating Summary";
+  Future<void> _simulateMerging(PlatformFile file) async {
+    final random = Random();
+    final steps = 5 + random.nextInt(6); // 5 to 10 steps
+    for (var i = 0; i < steps; i++) {
+      await Future.delayed(Duration(milliseconds: 100 + random.nextInt(200)));
+      setState(() {
+        _progress = (i + 1) / steps;
+      });
+    }
+  }
+
+  Future<void> _simulateSummarization(PlatformFile? file, bool isMerged) async {
+    final random = Random();
+    final depthFactor = summaryDepth + 1; // 1 to 4
+    final fileSizeFactor = isMerged ? uploadedFiles.length : 1;
+    final steps = (10 * depthFactor * fileSizeFactor).round();
+
+    for (var i = 0; i < steps; i++) {
+      await Future.delayed(Duration(milliseconds: 50 + random.nextInt(100)));
+      setState(() {
+        _progress = (i + 1) / steps;
+      });
     }
   }
 
@@ -239,18 +254,22 @@ class UploadState extends State<Upload> with TickerProviderStateMixin {
                       const SizedBox(height: 20),
                       Text(
                         '${(_progress * 100).toStringAsFixed(0)}%',
-                        style: AppTextStyles.titleStyle,
+                        style: TextStyle(
+                          color: Color.lerp(AppColors.gradientStart,
+                              AppColors.gradientEnd, _progress),
+                          fontFamily: AppTextStyles.titleStyle.fontFamily,
+                          fontSize: AppTextStyles.titleStyle.fontSize,
+                          fontWeight: AppTextStyles.titleStyle.fontWeight,
+                        ),
                       ),
                       const SizedBox(height: 10),
                       Text(
-                        _currentStep,
+                        _currentStepName,
                         style: AppTextStyles.bodyTextStyle,
                       ),
                       const SizedBox(height: 10),
                       Text(
-                        _mergeSummaries
-                            ? 'Merging summaries'
-                            : 'Processing file ${_currentFileIndex + 1} of ${uploadedFiles.length}',
+                        'Step $_currentStep of $_totalSteps',
                         style:
                             AppTextStyles.bodyTextStyle.copyWith(fontSize: 14),
                       ),
@@ -888,7 +907,7 @@ class UploadState extends State<Upload> with TickerProviderStateMixin {
       child: SwitchListTile(
         title: Text(
           'Merge Summaries',
-          style: AppTextStyles.bodyTextStyle
+          style: AppTextStyles.titleStyle
               .copyWith(color: AppColors.primaryTextColorDark),
         ),
         value: _mergeSummaries,
@@ -897,10 +916,10 @@ class UploadState extends State<Upload> with TickerProviderStateMixin {
             _mergeSummaries = value;
           });
         },
-        activeColor: AppColors.gradientEnd,
-        activeTrackColor: AppColors.gradientMiddle,
+        activeColor: AppColors.gradientStart,
+        activeTrackColor: AppColors.gradientEnd,
         inactiveThumbColor: AppColors.secondaryTextColor,
-        inactiveTrackColor: AppColors.secondaryTextColor.withOpacity(0.5),
+        inactiveTrackColor: AppColors.gradientMiddle,
       ),
     );
   }
