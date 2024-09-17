@@ -429,7 +429,23 @@ class UploadState extends State<Upload> with TickerProviderStateMixin {
 
   Widget _buildPreviewContent(double width, double height) {
     if (_filePreviewContent == null) {
-      return const Center(child: CircularProgressIndicator());
+      return const Center(
+        child: Column(
+          children: [
+            CircularProgressIndicator(),
+            SizedBox(
+              height: 20,
+            ),
+            Text(
+              'Preview content is null',
+              style: TextStyle(
+                color: AppColors.primaryTextColor,
+                fontSize: 20,
+              ),
+            ),
+          ],
+        ),
+      );
     }
 
     if (_filePreviewContent is String) {
