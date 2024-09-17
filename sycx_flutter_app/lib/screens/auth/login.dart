@@ -35,7 +35,7 @@ class LoginState extends State<Login> {
       } else {
         Fluttertoast.showToast(
           msg: result['message'],
-          toastLength: Toast.LENGTH_SHORT,
+          toastLength: Toast.LENGTH_LONG,
           gravity: ToastGravity.BOTTOM,
           backgroundColor: AppColors.gradientMiddle,
           textColor: Colors.white,
@@ -54,7 +54,7 @@ class LoginState extends State<Login> {
     } else {
       Fluttertoast.showToast(
         msg: result['message'],
-        toastLength: Toast.LENGTH_SHORT,
+        toastLength: Toast.LENGTH_LONG,
         gravity: ToastGravity.BOTTOM,
         backgroundColor: AppColors.gradientMiddle,
         textColor: Colors.white,
@@ -72,7 +72,7 @@ class LoginState extends State<Login> {
     } else {
       Fluttertoast.showToast(
         msg: result['message'],
-        toastLength: Toast.LENGTH_SHORT,
+        toastLength: Toast.LENGTH_LONG,
         gravity: ToastGravity.BOTTOM,
         backgroundColor: AppColors.gradientMiddle,
         textColor: Colors.white,

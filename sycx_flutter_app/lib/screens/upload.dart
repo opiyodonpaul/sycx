@@ -93,8 +93,10 @@ class UploadState extends State<Upload> with TickerProviderStateMixin {
     if (uploadedFiles.isEmpty) {
       Fluttertoast.showToast(
         msg: "Please upload at least one file",
+        toastLength: Toast.LENGTH_LONG,
+        gravity: ToastGravity.BOTTOM,
         backgroundColor: AppColors.gradientMiddle,
-        textColor: AppColors.primaryTextColor,
+        textColor: Colors.white,
       );
       return;
     }
@@ -152,8 +154,10 @@ class UploadState extends State<Upload> with TickerProviderStateMixin {
       _loadingAnimationController.reverse();
       Fluttertoast.showToast(
         msg: "Failed to summarize documents: ${e.toString()}",
-        backgroundColor: AppColors.gradientEnd,
-        textColor: AppColors.primaryTextColor,
+        toastLength: Toast.LENGTH_LONG,
+        gravity: ToastGravity.BOTTOM,
+        backgroundColor: AppColors.gradientMiddle,
+        textColor: Colors.white,
       );
     }
   }
@@ -556,9 +560,31 @@ class UploadState extends State<Upload> with TickerProviderStateMixin {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'Preview Content (${uploadedFiles.length} files)',
-            style: AppTextStyles.titleStyle,
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Preview Content (${uploadedFiles.length} files)',
+                style: AppTextStyles.titleStyle,
+              ),
+              ElevatedButton(
+                onPressed: () {
+                  setState(() {
+                    uploadedFiles.clear();
+                  });
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primaryButtonColor,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                ),
+                child: Text(
+                  'Clear All',
+                  style: AppTextStyles.buttonTextStyle,
+                ),
+              ),
+            ],
           ),
           uploadedFiles.isEmpty
               ? Card(
@@ -590,6 +616,7 @@ class UploadState extends State<Upload> with TickerProviderStateMixin {
               : ListView.builder(
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
+                  padding: EdgeInsets.zero,
                   itemCount: uploadedFiles.length,
                   itemBuilder: (context, index) {
                     final file = uploadedFiles[index];
@@ -624,13 +651,22 @@ class UploadState extends State<Upload> with TickerProviderStateMixin {
                                   fontSize: 12,
                                 ),
                               ),
+                              const SizedBox(
+                                height: 5,
+                              ),
                               Wrap(
                                 spacing: 4,
                                 children: [
                                   _buildTag('Document'),
+                                  const SizedBox(
+                                    width: 1.5,
+                                  ),
                                   _buildTag(file.extension?.toUpperCase() ??
                                       'Unknown'),
                                 ],
+                              ),
+                              const SizedBox(
+                                height: 4,
                               ),
                             ],
                           ),
@@ -638,7 +674,7 @@ class UploadState extends State<Upload> with TickerProviderStateMixin {
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               IconButton(
-                                icon: const Icon(Icons.delete,
+                                icon: const Icon(Icons.delete_outline_rounded,
                                     color: AppColors.gradientEnd),
                                 onPressed: () => removeFile(index),
                               ),
@@ -662,7 +698,7 @@ class UploadState extends State<Upload> with TickerProviderStateMixin {
 
   Widget _buildTag(String text) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 2),
       decoration: BoxDecoration(
         color: AppColors.gradientMiddle.withOpacity(0.3),
         borderRadius: BorderRadius.circular(12),
@@ -944,6 +980,54 @@ class UploadState extends State<Upload> with TickerProviderStateMixin {
       case 'ppt':
       case 'pptx':
         return Icons.slideshow;
+      case 'zip':
+      case 'rar':
+      case '7z':
+        return Icons.folder_zip;
+      case 'txt':
+        return Icons.text_snippet;
+      case 'py':
+        return Icons.code;
+      case 'html':
+      case 'htm':
+        return Icons.html;
+      case 'css':
+        return Icons.css;
+      case 'js':
+        return Icons.javascript;
+      case 'json':
+        return Icons.data_object;
+      case 'xml':
+        return Icons.code;
+      case 'java':
+        return Icons.coffee;
+      case 'cpp':
+      case 'c':
+        return Icons.code;
+      case 'swift':
+        return Icons.smartphone;
+      case 'kt':
+        return Icons.android;
+      case 'rb':
+        return Icons.code;
+      case 'php':
+        return Icons.php;
+      case 'sql':
+        return Icons.storage;
+      case 'mp3':
+      case 'wav':
+      case 'ogg':
+        return Icons.audio_file;
+      case 'mp4':
+      case 'avi':
+      case 'mov':
+        return Icons.video_file;
+      case 'jpg':
+      case 'jpeg':
+      case 'png':
+      case 'gif':
+      case 'bmp':
+        return Icons.image;
       default:
         return Icons.insert_drive_file;
     }
