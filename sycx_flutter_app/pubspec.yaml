@@ -60,6 +60,13 @@ dependencies:
   flutter_image_compress: ^2.3.0
   flutter_firebase_recaptcha: ^1.0.2
   workmanager: ^0.5.2
+  pdf_render: ^1.4.12
+  video_player: ^2.9.1
+  chewie: ^1.8.5
+  excel: ^4.0.6
+  csv: ^6.0.0
+  flutter_svg: ^2.0.10+1
+  audioplayers: ^6.1.0
 
 flutter_launcher_icons:
   android: true
