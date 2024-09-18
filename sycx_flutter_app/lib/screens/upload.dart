@@ -13,7 +13,7 @@ import 'package:sycx_flutter_app/widgets/custom_app_bar.dart';
 import 'package:sycx_flutter_app/widgets/custom_bottom_nav_bar.dart';
 import 'package:sycx_flutter_app/widgets/padded_round_slider_value_indicator_shape.dart';
 import 'package:dotted_border/dotted_border.dart';
-import 'package:pdf_render/pdf_render.dart' as pdf_render;
+import 'package:syncfusion_flutter_pdfviewer/pdfviewer.dart';
 import 'package:video_player/video_player.dart';
 import 'package:chewie/chewie.dart';
 import 'package:audioplayers/audioplayers.dart';
@@ -52,6 +52,10 @@ class UploadState extends State<Upload> with TickerProviderStateMixin {
   VideoPlayerController? _videoPlayerController;
   ChewieController? _chewieController;
   AudioPlayer? _audioPlayer;
+  PdfViewerController? _pdfViewerController;
+
+  int _currentPdfPage = 1;
+  int _totalPdfPages = 0;
 
   @override
   void initState() {
@@ -73,6 +77,7 @@ class UploadState extends State<Upload> with TickerProviderStateMixin {
       duration: const Duration(milliseconds: 300),
     );
     _animationController.forward();
+    _pdfViewerController = PdfViewerController();
     CustomBottomNavBar.updateLastMainRoute('/upload');
   }
 
@@ -85,6 +90,7 @@ class UploadState extends State<Upload> with TickerProviderStateMixin {
     _videoPlayerController?.dispose();
     _chewieController?.dispose();
     _audioPlayer?.dispose();
+    _pdfViewerController?.dispose();
     super.dispose();
   }
 
@@ -209,6 +215,8 @@ class UploadState extends State<Upload> with TickerProviderStateMixin {
   Future<void> _loadFilePreview(PlatformFile file) async {
     setState(() {
       _filePreviewContent = null;
+      _currentPdfPage = 1;
+      _totalPdfPages = 0;
     });
 
     switch (file.extension?.toLowerCase()) {
@@ -234,12 +242,8 @@ class UploadState extends State<Upload> with TickerProviderStateMixin {
         });
         break;
       case 'pdf':
-        final document = await pdf_render.PdfDocument.openFile(file.path!);
-        final page = await document.getPage(1);
-        final pageImage = await page.render(
-            width: page.width as int, height: page.height as int);
         setState(() {
-          _filePreviewContent = pageImage.createImageIfNotAvailable();
+          _filePreviewContent = 'pdf';
         });
         break;
       case 'doc':
@@ -445,6 +449,47 @@ class UploadState extends State<Upload> with TickerProviderStateMixin {
             ),
           ],
         ),
+      );
+    }
+
+    if (_filePreviewContent == 'pdf') {
+      return Column(
+        children: [
+          Expanded(
+            child: SfPdfViewer.file(
+              File(_previewFile!.path!),
+              controller: _pdfViewerController,
+              onDocumentLoaded: (PdfDocumentLoadedDetails details) {
+                setState(() {
+                  _totalPdfPages = details.document.pages.count;
+                });
+              },
+              onPageChanged: (PdfPageChangedDetails details) {
+                setState(() {
+                  _currentPdfPage = details.newPageNumber;
+                });
+              },
+            ),
+          ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              IconButton(
+                icon: const Icon(Icons.arrow_back),
+                onPressed: _currentPdfPage > 1
+                    ? () => _pdfViewerController?.previousPage()
+                    : null,
+              ),
+              Text('$_currentPdfPage / $_totalPdfPages'),
+              IconButton(
+                icon: const Icon(Icons.arrow_forward),
+                onPressed: _currentPdfPage < _totalPdfPages
+                    ? () => _pdfViewerController?.nextPage()
+                    : null,
+              ),
+            ],
+          ),
+        ],
       );
     }
 
