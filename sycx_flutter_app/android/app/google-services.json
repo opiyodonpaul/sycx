@@ -14,11 +14,11 @@
       },
       "oauth_client": [
         {
-          "client_id": "666516149325-qdr2e27nkbhviiul07be9poj5hq22u16.apps.googleusercontent.com",
+          "client_id": "666516149325-kkkn10jde5te444t936nu32m8oqf8rqp.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
             "package_name": "com.donartkins.sycx",
-            "certificate_hash": "6ba9c71dcf30a45095031e02febec93771ab82e3"
+            "certificate_hash": "5fc6a5842919d704b5dfe2c381e96bdb1bbb47f9"
           }
         },
         {

@@ -66,6 +66,7 @@ dependencies:
   audioplayers: ^6.1.0
   syncfusion_flutter_pdf: ^26.2.14
   syncfusion_flutter_pdfviewer: ^26.2.14
+  flutter_markdown: ^0.7.3+2
 
 flutter_launcher_icons:
   android: true

@@ -1,5 +1,6 @@
 class DummyData {
   static final user = {
+    'id': '1',
     'name': 'Artkins',
     'email': 'opiyodon@gmail.com',
     'avatar':

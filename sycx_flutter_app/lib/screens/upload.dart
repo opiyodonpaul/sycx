@@ -1,12 +1,13 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
-import 'dart:math';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter_svg/svg.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:sycx_flutter_app/dummy_data.dart';
+import 'package:sycx_flutter_app/services/summary.dart';
 import 'package:sycx_flutter_app/utils/constants.dart';
 import 'package:sycx_flutter_app/widgets/animated_button.dart';
 import 'package:sycx_flutter_app/widgets/custom_app_bar.dart';
@@ -17,6 +18,7 @@ import 'package:syncfusion_flutter_pdfviewer/pdfviewer.dart';
 import 'package:video_player/video_player.dart';
 import 'package:chewie/chewie.dart';
 import 'package:audioplayers/audioplayers.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class Upload extends StatefulWidget {
   const Upload({super.key});
@@ -26,6 +28,7 @@ class Upload extends StatefulWidget {
 }
 
 class UploadState extends State<Upload> with TickerProviderStateMixin {
+  String? currentUserId;
   List<PlatformFile> uploadedFiles = [];
   double summaryDepth = 0;
   bool isLoading = false;
@@ -43,7 +46,7 @@ class UploadState extends State<Upload> with TickerProviderStateMixin {
     'German',
     'Chinese',
   ];
-  String _currentStepName = '';
+  final String _currentStepName = '';
   PlatformFile? _previewFile;
   bool _mergeSummaries = false;
   dynamic _filePreviewContent;
@@ -78,6 +81,8 @@ class UploadState extends State<Upload> with TickerProviderStateMixin {
     );
     _animationController.forward();
     _pdfViewerController = PdfViewerController();
+    // Get the current user's ID
+    currentUserId = FirebaseAuth.instance.currentUser?.uid;
     CustomBottomNavBar.updateLastMainRoute('/upload');
   }
 
@@ -97,7 +102,8 @@ class UploadState extends State<Upload> with TickerProviderStateMixin {
   Future<void> pickFiles() async {
     final result = await FilePicker.platform.pickFiles(
       allowMultiple: true,
-      type: FileType.any,
+      type: FileType.custom,
+      allowedExtensions: ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'jpg', 'jpeg', 'png', 'gif', 'bmp'],
     );
 
     if (result != null) {
@@ -128,6 +134,17 @@ class UploadState extends State<Upload> with TickerProviderStateMixin {
       return;
     }
 
+    if (currentUserId == null) {
+      Fluttertoast.showToast(
+        msg: "User not logged in",
+        toastLength: Toast.LENGTH_LONG,
+        gravity: ToastGravity.BOTTOM,
+        backgroundColor: AppColors.gradientMiddle,
+        textColor: Colors.white,
+      );
+      return;
+    }
+
     setState(() {
       _progress = 0.0;
       isLoading = true;
@@ -138,40 +155,37 @@ class UploadState extends State<Upload> with TickerProviderStateMixin {
     _loadingAnimationController.forward();
 
     try {
-      if (_mergeSummaries) {
-        // Merging process
-        for (var i = 0; i < uploadedFiles.length; i++) {
-          setState(() {
-            _currentStep = i + 1;
-            _currentStepName = 'Merging file ${i + 1}/${uploadedFiles.length}';
-          });
-          await _simulateMerging(uploadedFiles[i]);
-        }
-
-        // Summarize merged document
-        setState(() {
-          _currentStep = uploadedFiles.length + 1;
-          _currentStepName = 'Summarizing merged document';
+      List<Map<String, dynamic>> documents = [];
+      for (var file in uploadedFiles) {
+        final bytes = await File(file.path!).readAsBytes();
+        final base64Content = base64Encode(bytes);
+        documents.add({
+          'name': file.name,
+          'content': base64Content,
+          'type': file.extension,
         });
-        await _simulateSummarization(null, true);
-      } else {
-        // Summarize each file individually
-        for (var i = 0; i < uploadedFiles.length; i++) {
-          setState(() {
-            _currentStep = i + 1;
-            _currentStepName =
-                'Summarizing file ${i + 1}/${uploadedFiles.length}';
-          });
-          await _simulateSummarization(uploadedFiles[i], false);
-        }
       }
+
+      final summaryResult = await SummaryService.summarizeDocuments(
+        currentUserId!,
+        documents,
+        _mergeSummaries,
+        summaryDepth,
+        _selectedLanguage,
+        (progress) {
+          setState(() {
+            _progress = progress;
+            _currentStep = (_totalSteps * progress).round();
+          });
+        },
+      );
 
       setState(() {
         isLoading = false;
       });
       _loadingAnimationController.reverse();
 
-      Navigator.pushNamed(context, '/summaries');
+      Navigator.pushNamed(context, '/summaries', arguments: summaryResult);
     } catch (e) {
       setState(() {
         isLoading = false;
@@ -184,31 +198,6 @@ class UploadState extends State<Upload> with TickerProviderStateMixin {
         backgroundColor: AppColors.gradientMiddle,
         textColor: Colors.white,
       );
-    }
-  }
-
-  Future<void> _simulateMerging(PlatformFile file) async {
-    final random = Random();
-    final steps = 5 + random.nextInt(6); // 5 to 10 steps
-    for (var i = 0; i < steps; i++) {
-      await Future.delayed(Duration(milliseconds: 100 + random.nextInt(200)));
-      setState(() {
-        _progress = (i + 1) / steps;
-      });
-    }
-  }
-
-  Future<void> _simulateSummarization(PlatformFile? file, bool isMerged) async {
-    final random = Random();
-    final depthFactor = summaryDepth + 1; // 1 to 4
-    final fileSizeFactor = isMerged ? uploadedFiles.length : 1;
-    final steps = (10 * depthFactor * fileSizeFactor).round();
-
-    for (var i = 0; i < steps; i++) {
-      await Future.delayed(Duration(milliseconds: 50 + random.nextInt(100)));
-      setState(() {
-        _progress = (i + 1) / steps;
-      });
     }
   }
 
