@@ -76,7 +76,7 @@ class SplashState extends State<Splash> with SingleTickerProviderStateMixin {
                 Column(
                   children: [
                     Image.asset(
-                      'assets/logo/logo.png',
+                      'assets/logo/icon.png',
                       height: 80,
                       width: 80,
                     ),

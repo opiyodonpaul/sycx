@@ -17,38 +17,43 @@ class SummaryService {
       String language,
       Function(double) updateProgress,
       ) async {
-    final response = await apiClient.post(
-      '/summarize',
-      body: jsonEncode({
-        'user_id': userId,
-        'documents': documents,
-        'merge_summaries': mergeSummaries,
-        'summary_depth': summaryDepth,
-        'language': language,
-      }),
-      headers: {'Content-Type': 'application/json'},
-      authRequired: true,
-    );
+    try {
+      final response = await apiClient.post(
+        '/summarize',
+        body: jsonEncode({
+          'user_id': userId,
+          'documents': documents,
+          'merge_summaries': mergeSummaries,
+          'summary_depth': summaryDepth,
+          'language': language,
+        }),
+        headers: {'Content-Type': 'application/json'},
+        authRequired: true,
+      );
 
-    if (response.statusCode == 200) {
-      final jsonResponse = jsonDecode(response.body);
-      final summaries = (jsonResponse['summaries'] as List)
-          .map((summary) => Summary.fromJson({
-        ...summary,
-        'userId': userId,
-        'createdAt': DateTime.now().toIso8601String(),
-        'updatedAt': DateTime.now().toIso8601String(),
-      }))
-          .toList();
+      if (response.statusCode == 200) {
+        final jsonResponse = jsonDecode(response.body);
+        final summaries = (jsonResponse['summaries'] as List)
+            .map((summary) => Summary.fromJson({
+          ...summary,
+          'userId': userId,
+          'createdAt': DateTime.now().toIso8601String(),
+          'updatedAt': DateTime.now().toIso8601String(),
+        }))
+            .toList();
 
-      // Save the summaries to Firestore
-      for (var summary in summaries) {
-        await database.createSummary(summary);
+        // Save the summaries to Firestore
+        for (var summary in summaries) {
+          await database.createSummary(summary);
+        }
+
+        return summaries;
+      } else {
+        throw Exception('Failed to summarize documents: ${response.body}');
       }
-
-      return summaries;
-    } else {
-      throw Exception('Failed to summarize documents');
+    } catch (e) {
+      print('Error in summarizeDocuments: $e');
+      rethrow;
     }
   }
 
@@ -61,16 +66,13 @@ class SummaryService {
         'Authorization': 'Bearer $token',
         'Content-Type': 'application/json'
       },
-      body: jsonEncode({
-        'summary_id': summaryId,
-        'user_id': userId,
-        'feedback': feedback
-      }),
+      body: jsonEncode(
+          {'summary_id': summaryId, 'user_id': userId, 'feedback': feedback}),
       authRequired: true,
     );
 
     if (response.statusCode != 200) {
-      throw Exception('Failed to submit feedback');
+      throw Exception('Failed to submit feedback: ${response.body}');
     }
   }
 
@@ -83,7 +85,7 @@ class SummaryService {
     );
 
     if (response.statusCode != 200) {
-      throw Exception('Failed to delete summary');
+      throw Exception('Failed to delete summary: ${response.body}');
     }
   }
 
@@ -98,6 +100,6 @@ class SummaryService {
     if (response.statusCode == 200) {
       return response.body;
     }
-    throw Exception('Failed to download summary');
+    throw Exception('Failed to download summary: ${response.body}');
   }
 }

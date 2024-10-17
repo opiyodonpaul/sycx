@@ -162,7 +162,7 @@ class UploadState extends State<Upload> with TickerProviderStateMixin {
         documents.add({
           'name': file.name,
           'content': base64Content,
-          'type': file.extension,
+          'type': file.extension ?? '',
         });
       }
 
