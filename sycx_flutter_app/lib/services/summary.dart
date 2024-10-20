@@ -1,6 +1,5 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
-import 'package:sycx_flutter_app/models/summary.dart';
 import 'package:sycx_flutter_app/services/api_client.dart';
 import 'package:sycx_flutter_app/services/database.dart';
 import 'package:sycx_flutter_app/utils/secure_storage.dart';
@@ -9,47 +8,64 @@ class SummaryService {
   static final ApiClient apiClient = ApiClient(httpClient: http.Client());
   static final Database database = Database();
 
-  static Future<List<Summary>> summarizeDocuments(
-      String userId,
-      List<Map<String, dynamic>> documents,
-      bool mergeSummaries,
-      double summaryDepth,
-      String language,
-      Function(double) updateProgress,
-      ) async {
+  static Future<List<Map<String, dynamic>>> summarizeDocuments(
+    List<Map<String, dynamic>> documents,
+    bool mergeSummaries,
+    double summaryDepth,
+    String language,
+    Function(double) updateProgress,
+  ) async {
     try {
-      final response = await apiClient.post(
-        '/summarize',
-        body: jsonEncode({
-          'user_id': userId,
-          'documents': documents,
-          'merge_summaries': mergeSummaries,
-          'summary_depth': summaryDepth,
-          'language': language,
-        }),
-        headers: {'Content-Type': 'application/json'},
-        authRequired: true,
-      );
+      final url = apiClient.buildUri('/summarize');
+
+      // Prepare the JSON payload
+      final payload = {
+        'merge_summaries': mergeSummaries,
+        'summary_depth': summaryDepth,
+        'language': language,
+        'documents': documents,
+      };
+
+      // Set up headers for large JSON payload
+      final headers = {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      };
+
+      // Send the request with a timeout of 5 minutes
+      final response = await http
+          .post(
+            url,
+            headers: headers,
+            body: jsonEncode(payload),
+          )
+          .timeout(const Duration(minutes: 5));
 
       if (response.statusCode == 200) {
         final jsonResponse = jsonDecode(response.body);
-        final summaries = (jsonResponse['summaries'] as List)
-            .map((summary) => Summary.fromJson({
-          ...summary,
-          'userId': userId,
-          'createdAt': DateTime.now().toIso8601String(),
-          'updatedAt': DateTime.now().toIso8601String(),
-        }))
-            .toList();
 
-        // Save the summaries to Firestore
-        for (var summary in summaries) {
-          await database.createSummary(summary);
-        }
+        // Process and decode any base64 encoded data in the response
+        final summaries =
+            List<Map<String, dynamic>>.from(jsonResponse['summaries'])
+                .map((summary) {
+          if (summary.containsKey('visuals')) {
+            summary['visuals'] =
+                List<Map<String, dynamic>>.from(summary['visuals'])
+                    .map((visual) {
+              if (visual.containsKey('data') && visual['data'] is String) {
+                // Decode base64 data back to bytes
+                visual['data'] = base64Decode(visual['data']);
+              }
+              return visual;
+            }).toList();
+          }
+          return summary;
+        }).toList();
 
         return summaries;
       } else {
-        throw Exception('Failed to summarize documents: ${response.body}');
+        throw Exception(
+            'Failed to summarize documents: ${response.statusCode}\n${response.body}');
       }
     } catch (e) {
       print('Error in summarizeDocuments: $e');
