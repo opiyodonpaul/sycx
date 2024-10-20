@@ -19,6 +19,8 @@ import 'package:video_player/video_player.dart';
 import 'package:chewie/chewie.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:web_socket_channel/web_socket_channel.dart';
+import 'package:path/path.dart' as path;
 
 class Upload extends StatefulWidget {
   const Upload({super.key});
@@ -49,9 +51,10 @@ class UploadState extends State<Upload> with TickerProviderStateMixin {
   final String _currentStepName = '';
   PlatformFile? _previewFile;
   bool _mergeSummaries = false;
+  WebSocketChannel? _channel;
   dynamic _filePreviewContent;
-  int _totalSteps = 0;
-  int _currentStep = 0;
+  final int _totalSteps = 0;
+  final int _currentStep = 0;
   VideoPlayerController? _videoPlayerController;
   ChewieController? _chewieController;
   AudioPlayer? _audioPlayer;
@@ -84,6 +87,7 @@ class UploadState extends State<Upload> with TickerProviderStateMixin {
     // Get the current user's ID
     currentUserId = FirebaseAuth.instance.currentUser?.uid;
     CustomBottomNavBar.updateLastMainRoute('/upload');
+    connectWebSocket();
   }
 
   @override
@@ -96,6 +100,7 @@ class UploadState extends State<Upload> with TickerProviderStateMixin {
     _chewieController?.dispose();
     _audioPlayer?.dispose();
     _pdfViewerController?.dispose();
+    _channel?.sink.close();
     super.dispose();
   }
 
@@ -103,12 +108,26 @@ class UploadState extends State<Upload> with TickerProviderStateMixin {
     final result = await FilePicker.platform.pickFiles(
       allowMultiple: true,
       type: FileType.custom,
-      allowedExtensions: ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'jpg', 'jpeg', 'png', 'gif', 'bmp'],
+      allowedExtensions: [
+        'pdf',
+        'doc',
+        'docx',
+        'xls',
+        'xlsx',
+        'ppt',
+        'pptx',
+        'jpg',
+        'jpeg',
+        'png',
+        'gif',
+        'bmp',
+        'txt'
+      ],
     );
 
     if (result != null) {
       setState(() {
-        uploadedFiles.addAll(result.files);
+        uploadedFiles.addAll(result.files as Iterable<PlatformFile>);
       });
     }
   }
@@ -122,52 +141,91 @@ class UploadState extends State<Upload> with TickerProviderStateMixin {
     });
   }
 
+  void connectWebSocket() {
+    try {
+      _channel = WebSocketChannel.connect(
+        Uri.parse('ws://127.0.0.1:5000/socket.io/?EIO=4&transport=websocket'),
+      );
+      _channel!.stream.listen(
+        (message) {
+          try {
+            if (message.startsWith('42["summarization_progress",')) {
+              final data = jsonDecode(message.substring(2));
+              if (data[1]['type'] == 'progress') {
+                setState(() {
+                  _progress = data[1]['progress'] / 100;
+                });
+              }
+            }
+          } catch (e) {
+            print('Error parsing WebSocket message: $e');
+          }
+        },
+        onError: (error) {
+          print('WebSocket error: $error');
+          reconnectWebSocket();
+        },
+        onDone: () {
+          print('WebSocket connection closed');
+          reconnectWebSocket();
+        },
+      );
+    } catch (e) {
+      print('Error connecting to WebSocket: $e');
+      Future.delayed(const Duration(seconds: 5), reconnectWebSocket);
+    }
+  }
+
+  void reconnectWebSocket() {
+    if (!mounted) return;
+    Future.delayed(const Duration(seconds: 5), () {
+      if (mounted) connectWebSocket();
+    });
+  }
+
+  Future<String> encodeFileToBase64(File file) async {
+    try {
+      List<int> fileBytes = await file.readAsBytes();
+      String base64String = base64Encode(fileBytes);
+      return base64String;
+    } catch (e) {
+      throw Exception('Error encoding file: $e');
+    }
+  }
+
   Future<void> summarize() async {
     if (uploadedFiles.isEmpty) {
-      Fluttertoast.showToast(
-        msg: "Please upload at least one file",
-        toastLength: Toast.LENGTH_LONG,
-        gravity: ToastGravity.BOTTOM,
-        backgroundColor: AppColors.gradientMiddle,
-        textColor: Colors.white,
-      );
-      return;
-    }
-
-    if (currentUserId == null) {
-      Fluttertoast.showToast(
-        msg: "User not logged in",
-        toastLength: Toast.LENGTH_LONG,
-        gravity: ToastGravity.BOTTOM,
-        backgroundColor: AppColors.gradientMiddle,
-        textColor: Colors.white,
-      );
+      Fluttertoast.showToast(msg: "Please upload at least one file");
       return;
     }
 
     setState(() {
       _progress = 0.0;
       isLoading = true;
-      _totalSteps =
-          _mergeSummaries ? uploadedFiles.length + 1 : uploadedFiles.length;
-      _currentStep = 0;
     });
     _loadingAnimationController.forward();
 
     try {
       List<Map<String, dynamic>> documents = [];
       for (var file in uploadedFiles) {
-        final bytes = await File(file.path!).readAsBytes();
-        final base64Content = base64Encode(bytes);
-        documents.add({
-          'name': file.name,
-          'content': base64Content,
-          'type': file.extension ?? '',
-        });
+        try {
+          if (file.path == null) continue; // Skip files with null paths
+
+          final base64Content = await encodeFileToBase64(File(file.path!));
+          final fileExtension =
+              path.extension(file.path!).toLowerCase().replaceAll('.', '');
+
+          documents.add({
+            'name': path.basename(file.path!),
+            'content': base64Content,
+            'type': fileExtension,
+          });
+        } catch (e) {
+          throw Exception('Error processing file ${file.path}: $e');
+        }
       }
 
       final summaryResult = await SummaryService.summarizeDocuments(
-        currentUserId!,
         documents,
         _mergeSummaries,
         summaryDepth,
@@ -175,7 +233,6 @@ class UploadState extends State<Upload> with TickerProviderStateMixin {
         (progress) {
           setState(() {
             _progress = progress;
-            _currentStep = (_totalSteps * progress).round();
           });
         },
       );
@@ -185,19 +242,15 @@ class UploadState extends State<Upload> with TickerProviderStateMixin {
       });
       _loadingAnimationController.reverse();
 
-      Navigator.pushNamed(context, '/summaries', arguments: summaryResult);
+      if (mounted) {
+        Navigator.pushNamed(context, '/summaries', arguments: summaryResult);
+      }
     } catch (e) {
       setState(() {
         isLoading = false;
       });
       _loadingAnimationController.reverse();
-      Fluttertoast.showToast(
-        msg: "Failed to summarize documents: ${e.toString()}",
-        toastLength: Toast.LENGTH_LONG,
-        gravity: ToastGravity.BOTTOM,
-        backgroundColor: AppColors.gradientMiddle,
-        textColor: Colors.white,
-      );
+      Fluttertoast.showToast(msg: e.toString());
     }
   }
 
@@ -698,7 +751,7 @@ class UploadState extends State<Upload> with TickerProviderStateMixin {
                           ),
                           onTap: () {
                             setState(() {
-                              _previewFile = file;
+                              _previewFile = file as PlatformFile?;
                             });
                             _loadFilePreview(file);
                             _previewAnimationController.forward();

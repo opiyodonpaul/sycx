@@ -11,6 +11,17 @@ import re
 import markdown
 from tabulate import tabulate
 import logging
+from io import BytesIO
+from PIL import Image
+import base64
+from wordcloud import WordCloud
+import matplotlib.pyplot as plt
+from reportlab.lib.pagesizes import letter
+from reportlab.pdfgen import canvas
+from reportlab.lib.utils import ImageReader
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image as ReportLabImage
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.units import inch
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -20,8 +31,11 @@ try:
     nltk.data.find('tokenizers/punkt')
     nltk.data.find('corpora/stopwords')
 except LookupError:
-    nltk.download('punkt', quiet=True)
-    nltk.download('stopwords', quiet=True)
+    try:
+        nltk.download('punkt', quiet=True)
+        nltk.download('stopwords', quiet=True)
+    except Exception as e:
+        logging.warning(f"Failed to download NLTK data: {e}")
 
 # Cache and Rate Limiting Configurations
 image_cache = {}
@@ -41,22 +55,32 @@ def check_rate_limit(api_name):
         return True
     return False
 
-def summarize_documents(model, documents, merge_summaries, summary_depth, language):
+def summarize_documents(model, documents, merge_summaries, summary_depth, language, progress_callback):
     try:
-        if merge_summarPies:
+        total_docs = len(documents)
+        if total_docs == 0:
+            raise ValueError("No documents provided")
+
+        progress_per_doc = 100 / total_docs if not merge_summaries else 100
+
+        if merge_summaries:
             merged_content = "\n\n".join([doc['content'] for doc in documents])
-            max_length = int(len(merged_content) * summary_depth)
-            summary = model.generate_summary(merged_content, max_length=max_length)
-            formatted_summary = format_summary(summary)
-            return [{'title': 'Merged Summary', 'content': formatted_summary}]
+            summary = model(merged_content, summary_depth)
+            progress_callback(100)
+            return [{'title': 'Merged Summary', 'content': format_summary(summary)}]
         else:
             summaries = []
-            for doc in documents:
-                max_length = int(len(doc['content']) * summary_depth)
-                summary = model.generate_summary(doc['content'], max_length=max_length)
-                formatted_summary = format_summary(summary)
-                summaries.append({'title': doc['name'], 'content': formatted_summary})
+            for doc_index, doc in enumerate(documents):
+                doc_summary = model(doc['content'], summary_depth)
+                summaries.append({
+                    'title': doc['name'],
+                    'content': format_summary(doc_summary)
+                })
+                progress = min(100, ((doc_index + 1) / total_docs) * 100)
+                progress_callback(progress)
+            
             return summaries
+
     except Exception as e:
         logging.error(f"Error in summarize_documents: {str(e)}")
         raise
@@ -64,8 +88,8 @@ def summarize_documents(model, documents, merge_summaries, summary_depth, langua
 def format_summary(summary):
     try:
         paragraphs = summary.split('\n\n')
-        
         formatted_paragraphs = []
+        
         for i, paragraph in enumerate(paragraphs):
             if i == 0:
                 formatted_paragraphs.append(f"# {paragraph}")
@@ -78,9 +102,7 @@ def format_summary(summary):
                     formatted_paragraphs.append(f"\n## {paragraph}")
         
         formatted_summary = '\n\n'.join(formatted_paragraphs)
-        formatted_summary = re.sub(r'(\w+):', r'**\1**:', formatted_summary)
-        
-        return formatted_summary
+        return re.sub(r'(\w+):', r'**\1**:', formatted_summary)
     except Exception as e:
         logging.error(f"Error in format_summary: {str(e)}")
         raise
@@ -99,40 +121,15 @@ def extract_keywords(text):
         return keywords
     except Exception as e:
         logging.error(f"Error in extract_keywords: {str(e)}")
-        return []  # Return an empty list if keyword extraction fails
-
-def convert_to_tables(text):
-    try:
-        lines = text.split('\n')
-        table_lines = []
-        non_table_lines = []
-        
-        for line in lines:
-            if '|' in line and len(line.split('|')) > 2:
-                table_lines.append(line)
-            else:
-                if table_lines:
-                    non_table_lines.append(tabulate([row.split('|') for row in table_lines], tablefmt="pipe"))
-                    table_lines = []
-                non_table_lines.append(line)
-        
-        if table_lines:
-            non_table_lines.append(tabulate([row.split('|') for row in table_lines], tablefmt="pipe"))
-        
-        return '\n'.join(non_table_lines)
-    except Exception as e:
-        logging.error(f"Error in convert_to_tables: {str(e)}")
-        raise
+        return []
 
 def enrich_summary_with_visuals(summary):
     try:
         keywords = extract_keywords(summary['content'])
         images = fetch_images_from_multiple_sources(keywords)
+        wordcloud = generate_wordcloud(summary['content'])
         
-        if images:
-            enriched_summary = insert_visuals_into_summary(summary['content'], images)
-        else:
-            enriched_summary = summary['content']
+        enriched_summary = insert_visuals_into_summary(summary['content'], images, wordcloud)
         
         return {
             'title': summary['title'],
@@ -140,7 +137,7 @@ def enrich_summary_with_visuals(summary):
         }
     except Exception as e:
         logging.error(f"Error in enrich_summary_with_visuals: {str(e)}")
-        return summary  # Return the original summary if enrichment fails
+        return summary
 
 def fetch_images_from_multiple_sources(keywords):
     images = []
@@ -198,10 +195,30 @@ def fetch_image_pixabay(keyword):
         logging.error(f"Error fetching image from Pixabay: {str(e)}")
         return []
 
-def insert_visuals_into_summary(summary, images):
+def generate_wordcloud(text):
+    try:
+        wordcloud = WordCloud(width=800, height=400, background_color='white').generate(text)
+        plt.figure(figsize=(10, 5))
+        plt.imshow(wordcloud, interpolation='bilinear')
+        plt.axis('off')
+        img_buffer = BytesIO()
+        plt.savefig(img_buffer, format='png')
+        plt.close()
+        img_buffer.seek(0)
+        img_str = base64.b64encode(img_buffer.getvalue()).decode()
+        return f"data:image/png;base64,{img_str}"
+    except Exception as e:
+        logging.error(f"Error generating word cloud: {str(e)}")
+        return None
+
+def insert_visuals_into_summary(summary, images, wordcloud):
     try:
         paragraphs = summary.split('\n\n')
         enriched_paragraphs = []
+        
+        if wordcloud:
+            enriched_paragraphs.append(f'![Word Cloud]({wordcloud})')
+        
         for i, paragraph in enumerate(paragraphs):
             enriched_paragraphs.append(paragraph)
             
@@ -211,4 +228,45 @@ def insert_visuals_into_summary(summary, images):
         return '\n\n'.join(enriched_paragraphs)
     except Exception as e:
         logging.error(f"Error in insert_visuals_into_summary: {str(e)}")
+        raise
+
+def convert_summary_to_pdf(summary_content):
+    try:
+        buffer = BytesIO()
+        doc = SimpleDocTemplate(buffer, pagesize=letter,
+                                rightMargin=72, leftMargin=72,
+                                topMargin=72, bottomMargin=18)
+        
+        styles = getSampleStyleSheet()
+        styles.add(ParagraphStyle(name='Justify', alignment=4))
+        
+        story = []
+        
+        html = markdown.markdown(summary_content)
+        
+        paragraphs = re.split('<h[1-6]>|</h[1-6]>|<p>|</p>', html)
+        paragraphs = [p.strip() for p in paragraphs if p.strip()]
+        
+        for para in paragraphs:
+            if para.startswith('!['):
+                img_src = re.search(r'\((.*?)\)', para).group(1)
+                if img_src.startswith('data:image/png;base64,'):
+                    img_data = base64.b64decode(img_src.split(',')[1])
+                    img = ImageReader(BytesIO(img_data))
+                else:
+                    img = ImageReader(requests.get(img_src, stream=True).raw)
+                img_width, img_height = img.getSize()
+                aspect = img_height / float(img_width)
+                img_width = 6 * inch
+                img_height = aspect * img_width
+                story.append(ReportLabImage(img, width=img_width, height=img_height))
+            else:
+                story.append(Paragraph(para, styles['Justify']))
+            story.append(Spacer(1, 12))
+        
+        doc.build(story)
+        buffer.seek(0)
+        return buffer.getvalue()
+    except Exception as e:
+        logging.error(f"Error converting summary to PDF: {str(e)}")
         raise

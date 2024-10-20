@@ -1,87 +1,345 @@
-import numpy as np
-from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.metrics.pairwise import cosine_similarity
-from transformers import T5Tokenizer, T5ForConditionalGeneration
+from transformers import pipeline, AutoTokenizer, AutoModelForSeq2SeqLM
 import torch
-from nltk.tokenize import sent_tokenize
 import nltk
 import logging
+from typing import Optional, List, Dict, Union
+import os
+from dotenv import load_dotenv
+import time
+import re
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from threading import Lock
+
+# Load environment variables
+load_dotenv()
+HUGGINGFACE_API_KEY = os.getenv('HUGGINGFACE_API_KEY')
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-# Ensure NLTK data is downloaded
+# Download required NLTK data
 try:
-    nltk.data.find('tokenizers/punkt')
-except LookupError:
     nltk.download('punkt', quiet=True)
+    nltk.download('averaged_perceptron_tagger', quiet=True)
+    nltk.download('stopwords', quiet=True)
+except Exception as e:
+    logging.warning(f"Failed to download NLTK data: {e}")
 
 class SummarizationModel:
-    def __init__(self):
+    def __init__(self, model_name: str = "facebook/bart-large-cnn"):
+        """Initialize the summarization model with specified parameters."""
         try:
-            self.tokenizer = T5Tokenizer.from_pretrained('t5-small')
-            self.model = T5ForConditionalGeneration.from_pretrained('t5-small')
-            self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+            # Set Hugging Face API token
+            if HUGGINGFACE_API_KEY:
+                os.environ["TRANSFORMERS_TOKEN"] = HUGGINGFACE_API_KEY
+            
+            # Check for CUDA availability and set appropriate device
+            self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+            
+            # Load tokenizer and model
+            self.tokenizer = AutoTokenizer.from_pretrained(model_name, token=HUGGINGFACE_API_KEY)
+            self.model = AutoModelForSeq2SeqLM.from_pretrained(model_name, token=HUGGINGFACE_API_KEY)
+            
+            # Move model to appropriate device
             self.model.to(self.device)
-            self.vectorizer = TfidfVectorizer()
+            
+            # Create pipeline with optimized settings
+            self.summarizer = pipeline(
+                "summarization",
+                model=self.model,
+                tokenizer=self.tokenizer,
+                device=0 if torch.cuda.is_available() else -1,
+                framework="pt",
+                torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32
+            )
+            
+            # Enhanced settings for better performance
+            self.max_chunk_size = 1024
+            self.min_chunk_size = 10  # Lowered to handle very short texts
+            self.batch_size = 4 if torch.cuda.is_available() else 1
+            self.max_length_ratio = 0.4
+            self.min_length_ratio = 0.1
+            
+            # Thread safety
+            self.lock = Lock()
+            self.executor = ThreadPoolExecutor(max_workers=3)
+            
+            logging.info(f"Summarization model initialized successfully on {self.device}")
+            
         except Exception as e:
             logging.error(f"Error initializing SummarizationModel: {str(e)}")
             raise
 
-    def generate_summary(self, text, max_length=150, min_length=40):
+    def clean_text(self, text: str) -> str:
+        """Enhanced text cleaning with advanced filtering."""
+        if not isinstance(text, str):
+            return ""
+        
+        # Remove special characters and normalize whitespace
+        text = re.sub(r'[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\xFF]', '', text)
+        text = re.sub(r'\s+', ' ', text)
+        
+        # Remove very long strings that are likely garbage
+        text = ' '.join(word for word in text.split() if len(word) < 45)
+        
+        # Remove repeated punctuation
+        text = re.sub(r'([!?,.])\1+', r'\1', text)
+        
+        # Remove extra whitespace
+        text = text.strip()
+        
+        return text
+
+    def preprocess_text(self, text: str) -> str:
+        """Comprehensive text preprocessing pipeline."""
         try:
-            inputs = self.tokenizer.encode("summarize: " + text, return_tensors='pt', max_length=512, truncation=True)
-            inputs = inputs.to(self.device)
+            # Basic cleaning
+            text = self.clean_text(text)
             
-            summary_ids = self.model.generate(inputs, max_length=max_length, min_length=min_length, length_penalty=2.0, num_beams=4, early_stopping=True)
-            summary = self.tokenizer.decode(summary_ids[0], skip_special_tokens=True)
+            # Remove unnecessary line breaks while preserving paragraph structure
+            text = re.sub(r'\n+', '\n', text)
+            text = re.sub(r'([.!?])\n', r'\1 ', text)
             
-            return summary
+            # Handle common PDF artifacts
+            text = re.sub(r'(\w)-\n(\w)', r'\1\2', text)  # Fix hyphenation
+            text = re.sub(r'(?<=[.!?])\s*(?=[A-Z])', ' ', text)  # Fix sentence spacing
+            
+            # Remove redundant information
+            text = re.sub(r'Page \d+( of \d+)?', '', text)
+            text = re.sub(r'^\s*Table of Contents\s*$', '', text, flags=re.MULTILINE)
+            
+            return text
+            
+        except Exception as e:
+            logging.error(f"Error in preprocess_text: {str(e)}")
+            return text
+
+    def optimize_length_params(self, text: str, summary_depth: float = 0.3) -> tuple[int, int]:
+        """Dynamically optimize summary length parameters based on input characteristics."""
+        input_length = len(text.split())
+        
+        # Calculate base lengths using summary_depth
+        max_length = int(input_length * min(summary_depth, self.max_length_ratio))
+        min_length = int(input_length * max(summary_depth * 0.3, self.min_length_ratio))
+        
+        # Apply constraints
+        max_length = min(max(max_length, 20), 1024)  # Ensure reasonable bounds
+        min_length = min(max(min_length, 5), max_length - 5)
+        
+        return max_length, min_length
+
+    def generate_summary(self, text: str, summary_depth: float = 0.3, timeout: int = 30) -> Optional[str]:
+        """Generate a summary with enhanced error handling and timeout protection."""
+        try:
+            start_time = time.time()
+            
+            with self.lock:  # Ensure thread safety
+                # Input validation and preprocessing
+                cleaned_text = self.preprocess_text(text)
+                if not cleaned_text:
+                    return "Input text is empty after preprocessing."
+                
+                word_count = len(cleaned_text.split())
+                logging.info(f"Preprocessed text word count: {word_count}")
+                
+                if word_count < self.min_chunk_size:
+                    logging.info(f"Text too short for summarization (word count: {word_count}). Returning as is.")
+                    return cleaned_text  # Return the cleaned text as is for very short inputs
+
+                # Get optimized length parameters
+                max_length, min_length = self.optimize_length_params(cleaned_text, summary_depth)
+                logging.info(f"Summary parameters - max_length: {max_length}, min_length: {min_length}")
+
+                # Generate summary with optimized parameters
+                summary = self.summarizer(
+                    cleaned_text,
+                    max_length=max_length,
+                    min_length=min_length,
+                    do_sample=True,  # Enable sampling for better diversity
+                    num_beams=4,
+                    temperature=0.7,  # Lower temperature for more focused output
+                    top_k=50,
+                    top_p=0.95,
+                    early_stopping=True,
+                    no_repeat_ngram_size=3,
+                    batch_size=self.batch_size
+                )
+
+                # Check timeout
+                if time.time() - start_time > timeout:
+                    logging.warning("Summary generation timed out")
+                    return cleaned_text[:max_length]  # Return truncated text instead of timing out
+
+                result = summary[0]['summary_text'].strip()
+                
+                # Post-process summary
+                result = re.sub(r'\s+', ' ', result)  # Normalize whitespace
+                result = result.replace(' .', '.').replace(' ,', ',')  # Fix punctuation
+                
+                if not result:
+                    logging.warning("Generated summary is empty")
+                    return cleaned_text[:max_length]  # Return truncated text if summary is empty
+                
+                logging.info(f"Summary generated successfully (word count: {len(result.split())})")
+                return result
+
         except Exception as e:
             logging.error(f"Error in generate_summary: {str(e)}")
-            return "Error generating summary"
+            return f"Error generating summary: {str(e)}"
 
-    def improve_model(self, original_text, original_summary, feedback):
+    def chunk_text(self, text: str) -> List[str]:
+        """Improved text chunking with sentence boundary preservation."""
         try:
-            # Tokenize the original text and summary
-            original_sentences = sent_tokenize(original_text)
-            summary_sentences = sent_tokenize(original_summary)
+            sentences = nltk.sent_tokenize(text)
+            chunks = []
+            current_chunk = []
+            current_length = 0
             
-            # Vectorize sentences
-            all_sentences = original_sentences + summary_sentences
-            sentence_vectors = self.vectorizer.fit_transform(all_sentences)
+            for sentence in sentences:
+                sentence_length = len(self.tokenizer.encode(sentence))
+                
+                if current_length + sentence_length > self.max_chunk_size:
+                    if current_chunk:
+                        chunks.append(' '.join(current_chunk))
+                        current_chunk = []
+                        current_length = 0
+                
+                current_chunk.append(sentence)
+                current_length += sentence_length
             
-            # Calculate similarity between each original sentence and the summary
-            similarities = cosine_similarity(sentence_vectors[:len(original_sentences)], sentence_vectors[len(original_sentences):])
+            if current_chunk:
+                chunks.append(' '.join(current_chunk))
             
-            # Find sentences that were not well represented in the summary
-            underrepresented_sentences = [sent for i, sent in enumerate(original_sentences) if np.max(similarities[i]) < 0.3]
+            return chunks
             
-            # Create a new training example
-            new_input = "summarize: " + " ".join(underrepresented_sentences)
-            new_target = feedback
-            
-            # Fine-tune the model on this new example
-            inputs = self.tokenizer(new_input, return_tensors="pt", max_length=512, truncation=True)
-            targets = self.tokenizer(new_target, return_tensors="pt", max_length=150, truncation=True)
-            
-            inputs = inputs.to(self.device)
-            targets = targets.to(self.device)
-            
-            self.model.train()
-            outputs = self.model(**inputs, labels=targets["input_ids"])
-            loss = outputs.loss
-            loss.backward()
-            
-            # Update model parameters
-            optimizer = torch.optim.Adam(self.model.parameters(), lr=1e-5)
-            optimizer.step()
-            
-            logging.info(f"Model improved based on feedback. Loss: {loss.item()}")
         except Exception as e:
-            logging.error(f"Error in improve_model: {str(e)}")
+            logging.error(f"Error in chunk_text: {str(e)}")
+            return [text]
 
-summarization_model = SummarizationModel()
+    def summarize_long_document(self, text: str, summary_depth: float = 0.3, max_time: int = 300) -> str:
+        """Handle long documents with improved chunking and multi-stage summarization."""
+        try:
+            start_time = time.time()
+            
+            # Preprocess the entire document
+            cleaned_text = self.preprocess_text(text)
+            if not cleaned_text:
+                return "Empty or invalid document"
+
+            # For shorter texts, summarize directly
+            if len(cleaned_text.split()) <= self.max_chunk_size:
+                return self.generate_summary(cleaned_text, summary_depth)
+
+            # For long texts, use multi-stage summarization
+            chunks = self.chunk_text(cleaned_text)
+            if not chunks:
+                return "Unable to process document"
+
+            # First stage: Summarize each chunk
+            chunk_summaries = []
+            futures = []
+            
+            with ThreadPoolExecutor() as executor:
+                for chunk in chunks:
+                    if time.time() - start_time > max_time:
+                        logging.warning("Document summarization timed out")
+                        break
+                    
+                    future = executor.submit(self.generate_summary, chunk, summary_depth)
+                    futures.append(future)
+                
+                # Collect results
+                for future in as_completed(futures):
+                    if time.time() - start_time > max_time:
+                        break
+                    try:
+                        summary = future.result(timeout=30)
+                        if summary and not summary.startswith("Error"):
+                            chunk_summaries.append(summary)
+                    except Exception as e:
+                        logging.error(f"Error processing chunk: {str(e)}")
+
+            # Second stage: Combine and summarize again if needed
+            if len(chunk_summaries) > 1:
+                combined_text = " ".join(chunk_summaries)
+                return self.generate_summary(combined_text, summary_depth)
+            elif chunk_summaries:
+                return chunk_summaries[0]
+            else:
+                return "Unable to generate summary"
+
+        except Exception as e:
+            logging.error(f"Error in summarize_long_document: {str(e)}")
+            return f"Error summarizing document: {str(e)}"
+
+    def __call__(self, text: str, summary_depth: float = 0.3) -> str:
+        """Enhanced call method with automatic handling of document length."""
+        word_count = len(text.split())
+        if word_count > self.max_chunk_size:
+            return self.summarize_long_document(text, summary_depth)
+        return self.generate_summary(text, summary_depth)
+
+# Singleton instance with thread-safe lazy loading
+_model_lock = Lock()
+_summarization_model = None
 
 def get_model():
-    return summarization_model
+    """Get or create singleton instance of SummarizationModel with thread safety."""
+    global _summarization_model
+    with _model_lock:
+        if _summarization_model is None:
+            _summarization_model = SummarizationModel()
+        return _summarization_model
+
+if __name__ == "__main__":
+    # Test the model with sample texts of varying lengths
+    model = get_model()
+    
+    sample_texts = [
+        "This is a very short text.",
+        """
+        Artificial intelligence (AI) is intelligence demonstrated by machines, as opposed to natural intelligence displayed by 
+        animals including humans. AI research has been defined as the field of study of intelligent agents, which refers to any 
+        system that perceives its environment and takes actions that maximize its chance of achieving its goals.
+        """,
+        # Add a long text here for testing, e.g., a few paragraphs or more
+        "This is a very long text.",
+        """
+        Artificial intelligence (AI) is intelligence demonstrated by machines, as opposed to natural intelligence displayed by 
+        animals including humans. AI research has been defined as the field of study of intelligent agents, which refers to any 
+        system that perceives its environment and takes actions that maximize its chance of achieving its goals.
+        Artificial intelligence (AI) is intelligence demonstrated by machines, as opposed to natural intelligence displayed by 
+        animals including humans. AI research has been defined as the field of study of intelligent agents, which refers to any 
+        system that perceives its environment and takes actions that maximize its chance of achieving its goals.
+        Artificial intelligence (AI) is intelligence demonstrated by machines, as opposed to natural intelligence displayed by 
+        animals including humans. AI research has been defined as the field of study of intelligent agents, which refers to any 
+        system that perceives its environment and takes actions that maximize its chance of achieving its goals.
+        Artificial intelligence (AI) is intelligence demonstrated by machines, as opposed to natural intelligence displayed by 
+        animals including humans. AI research has been defined as the field of study of intelligent agents, which refers to any 
+        system that perceives its environment and takes actions that maximize its chance of achieving its goals.
+        Artificial intelligence (AI) is intelligence demonstrated by machines, as opposed to natural intelligence displayed by 
+        animals including humans. AI research has been defined as the field of study of intelligent agents, which refers to any 
+        system that perceives its environment and takes actions that maximize its chance of achieving its goals.
+        Artificial intelligence (AI) is intelligence demonstrated by machines, as opposed to natural intelligence displayed by 
+        animals including humans. AI research has been defined as the field of study of intelligent agents, which refers to any 
+        system that perceives its environment and takes actions that maximize its chance of achieving its goals.
+        Artificial intelligence (AI) is intelligence demonstrated by machines, as opposed to natural intelligence displayed by 
+        animals including humans. AI research has been defined as the field of study of intelligent agents, which refers to any 
+        system that perceives its environment and takes actions that maximize its chance of achieving its goals.
+        Artificial intelligence (AI) is intelligence demonstrated by machines, as opposed to natural intelligence displayed by 
+        animals including humans. AI research has been defined as the field of study of intelligent agents, which refers to any 
+        system that perceives its environment and takes actions that maximize its chance of achieving its goals.
+        """,
+    ]
+    
+    for i, text in enumerate(sample_texts, 1):
+        try:
+            print(f"\nTest {i}: {'Short' if len(text.split()) < 50 else 'Medium' if len(text.split()) < 200 else 'Long'} Text")
+            print("Input text:")
+            print(text[:100] + "..." if len(text) > 100 else text)
+            print("\nGenerating summary...")
+            summary = model(text)
+            print("Generated summary:")
+            print(summary)
+        except Exception as e:
+            print(f"Error during summarization: {str(e)}")
