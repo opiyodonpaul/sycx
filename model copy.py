@@ -9,7 +9,6 @@ import time
 import re
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from threading import Lock
-from cachetools import LRUCache
 
 # Load environment variables
 load_dotenv()
@@ -23,23 +22,8 @@ try:
     nltk.download('punkt', quiet=True)
     nltk.download('averaged_perceptron_tagger', quiet=True)
     nltk.download('stopwords', quiet=True)
-    nltk.download('punkt_tab', quiet=True)  # Add this line
-    # Verify the downloads
-    nltk.data.find('tokenizers/punkt')
-    nltk.data.find('tokenizers/punkt_tab')
-    nltk.data.find('corpora/stopwords')
 except Exception as e:
     logging.warning(f"Failed to download NLTK data: {e}")
-    # Create necessary directories and retry download
-    try:
-        import os
-        nltk_data_dir = os.path.expanduser('~/nltk_data')
-        os.makedirs(nltk_data_dir, exist_ok=True)
-        nltk.download('punkt', quiet=True, download_dir=nltk_data_dir)
-        nltk.download('punkt_tab', quiet=True, download_dir=nltk_data_dir)
-        nltk.download('stopwords', quiet=True, download_dir=nltk_data_dir)
-    except Exception as e:
-        logging.error(f"Failed to create NLTK data directory and download data: {e}")
 
 class SummarizationModel:
     def __init__(self, model_name: str = "facebook/bart-large-cnn"):
@@ -53,8 +37,8 @@ class SummarizationModel:
             self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
             
             # Load tokenizer and model
-            self.tokenizer = AutoTokenizer.from_pretrained(model_name)
-            self.model = AutoModelForSeq2SeqLM.from_pretrained(model_name)
+            self.tokenizer = AutoTokenizer.from_pretrained(model_name, token=HUGGINGFACE_API_KEY)
+            self.model = AutoModelForSeq2SeqLM.from_pretrained(model_name, token=HUGGINGFACE_API_KEY)
             
             # Move model to appropriate device
             self.model.to(self.device)
@@ -79,9 +63,6 @@ class SummarizationModel:
             # Thread safety
             self.lock = Lock()
             self.executor = ThreadPoolExecutor(max_workers=3)
-            
-            # Caching
-            self.cache = LRUCache(maxsize=1000)
             
             logging.info(f"Summarization model initialized successfully on {self.device}")
             
@@ -147,101 +128,65 @@ class SummarizationModel:
         
         return max_length, min_length
 
-    def generate_summary(self, text: str, summary_depth: float = 0.3, mode: str = 'default') -> Optional[str]:
+    def generate_summary(self, text: str, summary_depth: float = 0.3, timeout: int = 30) -> Optional[str]:
+        """Generate a summary with enhanced error handling and timeout protection."""
         try:
             start_time = time.time()
+            
+            with self.lock:  # Ensure thread safety
+                # Input validation and preprocessing
+                cleaned_text = self.preprocess_text(text)
+                if not cleaned_text:
+                    return "Input text is empty after preprocessing."
+                
+                word_count = len(cleaned_text.split())
+                logging.info(f"Preprocessed text word count: {word_count}")
+                
+                if word_count < self.min_chunk_size:
+                    logging.info(f"Text too short for summarization (word count: {word_count}). Returning as is.")
+                    return cleaned_text  # Return the cleaned text as is for very short inputs
 
-            # Input validation and preprocessing
-            cleaned_text = self.preprocess_text(text)
-            if not cleaned_text:
-                return "Input text is empty after preprocessing."
+                # Get optimized length parameters
+                max_length, min_length = self.optimize_length_params(cleaned_text, summary_depth)
+                logging.info(f"Summary parameters - max_length: {max_length}, min_length: {min_length}")
 
-            word_count = len(cleaned_text.split())
-            logging.info(f"Preprocessed text word count: {word_count}")
+                # Generate summary with optimized parameters
+                summary = self.summarizer(
+                    cleaned_text,
+                    max_length=max_length,
+                    min_length=min_length,
+                    do_sample=True,  # Enable sampling for better diversity
+                    num_beams=4,
+                    temperature=0.7,  # Lower temperature for more focused output
+                    top_k=50,
+                    top_p=0.95,
+                    early_stopping=True,
+                    no_repeat_ngram_size=3,
+                    batch_size=self.batch_size
+                )
 
-            if word_count < self.min_chunk_size:
-                logging.info(f"Text too short for summarization (word count: {word_count}). Returning as is.")
-                return cleaned_text
+                # Check timeout
+                if time.time() - start_time > timeout:
+                    logging.warning("Summary generation timed out")
+                    return cleaned_text[:max_length]  # Return truncated text instead of timing out
 
-            # Check cache first
-            cache_key = f"{cleaned_text[:100]}_{summary_depth}_{mode}"
-            with self.lock:
-                cached_result = self.cache.get(cache_key)
-                if cached_result:
-                    return cached_result
-
-            # Get optimized length parameters
-            max_length, min_length = self.optimize_length_params(cleaned_text, summary_depth)
-            logging.info(f"Summary parameters - max_length: {max_length}, min_length: {min_length}")
-
-            try:
-                # Generate summary with optimized parameters and error handling
-                if mode == 'incremental':
-                    summaries = self.summarizer(
-                        cleaned_text,
-                        max_length=max_length,
-                        min_length=min_length,
-                        do_sample=True,
-                        num_beams=4,
-                        temperature=0.7,
-                        top_k=50,
-                        top_p=0.95,
-                        early_stopping=True,
-                        no_repeat_ngram_size=3,
-                        batch_size=self.batch_size,
-                        return_text=True,
-                        num_return_sequences=1
-                    )
-                    result = summaries[0]['summary_text']
-                else:
-                    summary = self.summarizer(
-                        cleaned_text,
-                        max_length=max_length,
-                        min_length=min_length,
-                        do_sample=True,
-                        num_beams=4,
-                        temperature=0.7,
-                        top_k=50,
-                        top_p=0.95,
-                        early_stopping=True,
-                        no_repeat_ngram_size=3,
-                        batch_size=self.batch_size,
-                        return_text=True
-                    )
-                    if isinstance(summary, list) and len(summary) > 0:
-                        result = summary[0].get('summary_text', '').strip()
-                    else:
-                        result = cleaned_text[:max_length]
-
-            except Exception as e:
-                logging.error(f"Error in summarizer pipeline: {str(e)}")
-                result = cleaned_text[:max_length]
-
-            # Check timeout
-            if time.time() - start_time > 60:  # Timeout after 1 minute
-                logging.warning("Summary generation timed out")
-                return cleaned_text[:max_length]
-
-            if not result:
-                logging.warning("Generated summary is empty")
-                return cleaned_text[:max_length]
-
-            # Post-process summary
-            result = re.sub(r'\s+', ' ', result)
-            result = result.replace(' .', '.').replace(' ,', ',')
-
-            logging.info(f"Summary generated successfully (word count: {len(result.split())})")
-
-            # Cache the result
-            with self.lock:
-                self.cache[cache_key] = result
-
-            return result
+                result = summary[0]['summary_text'].strip()
+                
+                # Post-process summary
+                result = re.sub(r'\s+', ' ', result)  # Normalize whitespace
+                result = result.replace(' .', '.').replace(' ,', ',')  # Fix punctuation
+                
+                if not result:
+                    logging.warning("Generated summary is empty")
+                    return cleaned_text[:max_length]  # Return truncated text if summary is empty
+                
+                logging.info(f"Summary generated successfully (word count: {len(result.split())})")
+                return result
 
         except Exception as e:
             logging.error(f"Error in generate_summary: {str(e)}")
-            return text[:1024]
-    
+            return f"Error generating summary: {str(e)}"
+
     def chunk_text(self, text: str) -> List[str]:
         """Improved text chunking with sentence boundary preservation."""
         try:
@@ -327,15 +272,12 @@ class SummarizationModel:
             logging.error(f"Error in summarize_long_document: {str(e)}")
             return f"Error summarizing document: {str(e)}"
 
-    def __call__(self, text: str, summary_depth: float = 0.3, mode: str = 'default') -> str:
-        try:
-            word_count = len(text.split())
-            if word_count > self.max_chunk_size:
-                return self.summarize_long_document(text, summary_depth)
-            return self.generate_summary(text, summary_depth, mode)
-        except Exception as e:
-            logging.error(f"Error in __call__ method: {str(e)}")
-            return f"Error summarizing text: {str(e)}"
+    def __call__(self, text: str, summary_depth: float = 0.3) -> str:
+        """Enhanced call method with automatic handling of document length."""
+        word_count = len(text.split())
+        if word_count > self.max_chunk_size:
+            return self.summarize_long_document(text, summary_depth)
+        return self.generate_summary(text, summary_depth)
 
 # Singleton instance with thread-safe lazy loading
 _model_lock = Lock()
@@ -360,12 +302,34 @@ if __name__ == "__main__":
         animals including humans. AI research has been defined as the field of study of intelligent agents, which refers to any 
         system that perceives its environment and takes actions that maximize its chance of achieving its goals.
         """,
-        # Add a long text here for testing
+        # Add a long text here for testing, e.g., a few paragraphs or more
+        "This is a very long text.",
         """
         Artificial intelligence (AI) is intelligence demonstrated by machines, as opposed to natural intelligence displayed by 
         animals including humans. AI research has been defined as the field of study of intelligent agents, which refers to any 
         system that perceives its environment and takes actions that maximize its chance of achieving its goals.
-        """ * 8  # Repeat the text 8 times to create a long document
+        Artificial intelligence (AI) is intelligence demonstrated by machines, as opposed to natural intelligence displayed by 
+        animals including humans. AI research has been defined as the field of study of intelligent agents, which refers to any 
+        system that perceives its environment and takes actions that maximize its chance of achieving its goals.
+        Artificial intelligence (AI) is intelligence demonstrated by machines, as opposed to natural intelligence displayed by 
+        animals including humans. AI research has been defined as the field of study of intelligent agents, which refers to any 
+        system that perceives its environment and takes actions that maximize its chance of achieving its goals.
+        Artificial intelligence (AI) is intelligence demonstrated by machines, as opposed to natural intelligence displayed by 
+        animals including humans. AI research has been defined as the field of study of intelligent agents, which refers to any 
+        system that perceives its environment and takes actions that maximize its chance of achieving its goals.
+        Artificial intelligence (AI) is intelligence demonstrated by machines, as opposed to natural intelligence displayed by 
+        animals including humans. AI research has been defined as the field of study of intelligent agents, which refers to any 
+        system that perceives its environment and takes actions that maximize its chance of achieving its goals.
+        Artificial intelligence (AI) is intelligence demonstrated by machines, as opposed to natural intelligence displayed by 
+        animals including humans. AI research has been defined as the field of study of intelligent agents, which refers to any 
+        system that perceives its environment and takes actions that maximize its chance of achieving its goals.
+        Artificial intelligence (AI) is intelligence demonstrated by machines, as opposed to natural intelligence displayed by 
+        animals including humans. AI research has been defined as the field of study of intelligent agents, which refers to any 
+        system that perceives its environment and takes actions that maximize its chance of achieving its goals.
+        Artificial intelligence (AI) is intelligence demonstrated by machines, as opposed to natural intelligence displayed by 
+        animals including humans. AI research has been defined as the field of study of intelligent agents, which refers to any 
+        system that perceives its environment and takes actions that maximize its chance of achieving its goals.
+        """,
     ]
     
     for i, text in enumerate(sample_texts, 1):

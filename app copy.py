@@ -1,43 +1,26 @@
-from flask import Flask, request, jsonify, stream_with_context, Response
-from flask_limiter import Limiter
-from flask_limiter.util import get_remote_address
-from summarie import enrich_summary_with_visuals, convert_summary_to_pdf, generate_summary
+from flask import Flask, request, jsonify
+from flask_socketio import SocketIO, emit
+from summarie import summarize_documents, enrich_summary_with_visuals, convert_summary_to_pdf
 from model import get_model
 from dotenv import load_dotenv
 import os
 import base64
 import io
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor
 import logging
 import json
 import traceback
-from cachetools import TTLCache
-import nltk
-
-# Download required NLTK data
-try:
-    nltk.download('punkt', quiet=True)
-    nltk.download('stopwords', quiet=True)
-except Exception as e:
-    logging.warning(f"Failed to download NLTK data: {e}")
 
 load_dotenv()
 
 app = Flask(__name__)
 app.config['MAX_CONTENT_LENGTH'] = 1024 * 1024 * 1024
+socketio = SocketIO(app, cors_allowed_origins="*", max_http_buffer_size=1024 * 1024 * 1024)
 summarization_model = get_model()
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 executor = ThreadPoolExecutor(max_workers=10)
-cache = TTLCache(maxsize=1000, ttl=3600)  # Cache summaries for 1 hour
-
-# Initialize Limiter correctly
-limiter = Limiter(
-    app=app,
-    key_func=get_remote_address,
-    default_limits=["150 per day", "30 per hour"]
-)
 
 def extract_text_from_document(content, file_type):
     try:
@@ -83,19 +66,17 @@ def extract_text_from_document(content, file_type):
         logging.error(traceback.format_exc())
         raise Exception(f"Error extracting text from {file_type} file: {str(e)}")
 
+def progress_callback(progress):
+    socketio.emit('summarization_progress', {'type': 'progress', 'progress': progress})
+
 @app.route('/summarize', methods=['POST'])
-@limiter.limit("20 per minute")
 def summarize():
     try:
         data = request.get_json()
         if not data:
             return jsonify({'error': 'No JSON data received'}), 400
 
-        cache_key = json.dumps(data, sort_keys=True)
-        cached_result = cache.get(cache_key)
-        if cached_result:
-            return jsonify(cached_result), 200
-
+        merge_summaries = data.get('merge_summaries', False)
         summary_depth = float(data.get('summary_depth', 0.3))
         language = data.get('language', 'en')
         documents_data = data.get('documents', [])
@@ -103,57 +84,62 @@ def summarize():
         if not documents_data:
             return jsonify({'error': 'No documents provided'}), 400
 
-        try:
-            documents = []
-            for doc in documents_data:
-                try:
-                    text = extract_text_from_document(doc['content'], doc['type'])
-                    if text:
-                        documents.append({
-                            'name': doc['name'],
-                            'content': text,
-                            'type': doc['type']
-                        })
-                except Exception as e:
-                    logging.error(f"Error processing document {doc['name']}: {str(e)}")
-                    continue
+        documents = []
+        for doc in documents_data:
+            try:
+                text = extract_text_from_document(doc['content'], doc['type'])
+                documents.append({
+                    'name': doc['name'],
+                    'content': text,
+                    'type': doc['type']
+                })
+            except Exception as e:
+                logging.error(f"Error processing document {doc['name']}: {str(e)}")
+                logging.error(traceback.format_exc())
+                return jsonify({'error': f"Error processing document {doc['name']}: {str(e)}"}), 400
 
-            if not documents:
-                return jsonify({'error': 'No valid documents to process'}), 400
-
-            summarization_model = get_model()
-            summary_chunks = generate_summary(
-                summarization_model,
-                documents,
-                summary_depth,
-                language
-            )
-
-            def generate_summaries():
-                for summary_chunk in summary_chunks:
-                    try:
-                        enriched_summary = enrich_summary_with_visuals(summary_chunk)
-                        pdf_content = convert_summary_to_pdf(enriched_summary['content'])
-                        pdf_base64 = base64.b64encode(pdf_content).decode('utf-8')
-                        yield json.dumps({
-                            'title': enriched_summary['title'],
-                            'content': pdf_base64
-                        })
-                    except Exception as e:
-                        logging.error(f"Error processing summary chunk: {str(e)}")
-
-            response = Response(stream_with_context(generate_summaries()), mimetype='application/json')
-            cache[cache_key] = response.get_json()
-            return response, 200
-
-        except Exception as e:
-            logging.error(f"Error processing documents: {str(e)}")
-            return jsonify({'error': str(e)}), 500
+        summaries = summarize_documents(
+            summarization_model, 
+            documents, 
+            merge_summaries, 
+            summary_depth, 
+            language, 
+            progress_callback
+        )
+        
+        enriched_summaries = [enrich_summary_with_visuals(summary) for summary in summaries]
+        
+        pdf_summaries = []
+        for summary in enriched_summaries:
+            try:
+                pdf_content = convert_summary_to_pdf(summary['content'])
+                pdf_base64 = base64.b64encode(pdf_content).decode('utf-8')
+                pdf_summaries.append({
+                    'title': summary['title'],
+                    'content': pdf_base64
+                })
+            except Exception as e:
+                logging.error(f"Error converting summary to PDF: {str(e)}")
+                pdf_summaries.append({
+                    'title': summary['title'],
+                    'content': summary['content']
+                })
+        
+        return jsonify({'summaries': pdf_summaries}), 200
 
     except Exception as e:
         logging.error(f"Error in summarize route: {str(e)}")
         logging.error(traceback.format_exc())
         return jsonify({'error': str(e)}), 500
+
+@socketio.on('connect')
+def handle_connect():
+    logging.info('Client connected')
+    emit('connected', {'data': 'Connected'})
+
+@socketio.on('disconnect')
+def handle_disconnect():
+    logging.info('Client disconnected')
 
 @app.route('/feedback', methods=['POST'])
 def feedback():
@@ -174,4 +160,4 @@ def feedback():
         return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
-    app.run(debug=False, host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))
+    socketio.run(app, debug=False, host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))
