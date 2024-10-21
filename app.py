@@ -3,7 +3,7 @@ from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from summarie import enrich_summary_with_visuals, convert_summary_to_pdf, generate_summary
 from model import get_model
-from dotenv import load_dotenv
+from python_dotenv import load_dotenv
 import os
 import base64
 import io

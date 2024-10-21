@@ -4,7 +4,7 @@ import nltk
 import logging
 from typing import Optional, List, Dict, Union
 import os
-from dotenv import load_dotenv
+from python_dotenv import load_dotenv
 import time
 import re
 from concurrent.futures import ThreadPoolExecutor, as_completed
