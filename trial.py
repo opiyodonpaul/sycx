@@ -1,163 +1,173 @@
-from flask import Flask, request, jsonify
-from flask_socketio import SocketIO, emit
-from summarie import summarize_documents, enrich_summary_with_visuals, convert_summary_to_pdf
-from model import get_model
-from dotenv import load_dotenv
-import os
-import base64
-import io
-from concurrent.futures import ThreadPoolExecutor
+from transformers import pipeline, AutoTokenizer, AutoModelForSeq2SeqLM
+import torch
+import nltk
 import logging
-import json
-import traceback
+from typing import Optional, List, Dict, Union
+import os
+from dotenv import load_dotenv
+import time
+import re
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from threading import Lock
+from cachetools import LRUCache
 
+# Load environment variables
 load_dotenv()
+HUGGINGFACE_API_KEY = os.getenv('HUGGINGFACE_API_KEY')
 
-app = Flask(__name__)
-app.config['MAX_CONTENT_LENGTH'] = 1024 * 1024 * 1024
-socketio = SocketIO(app, cors_allowed_origins="*", max_http_buffer_size=1024 * 1024 * 1024)
-summarization_model = get_model()
-
+# Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-executor = ThreadPoolExecutor(max_workers=10)
-
-def extract_text_from_document(content, file_type):
+# Download required NLTK data
+try:
+    nltk.download('punkt', quiet=True)
+    nltk.download('averaged_perceptron_tagger', quiet=True)
+    nltk.download('stopwords', quiet=True)
+    nltk.download('punkt_tab', quiet=True)
+    # Verify the downloads
+    nltk.data.find('tokenizers/punkt')
+    nltk.data.find('tokenizers/punkt_tab')
+    nltk.data.find('corpora/stopwords')
+except Exception as e:
+    logging.warning(f"Failed to download NLTK data: {e}")
+    # Create necessary directories and retry download
     try:
-        if isinstance(content, str):
-            try:
-                content = base64.b64decode(content)
-            except:
-                content = content.encode('utf-8')
-        
-        if file_type == 'pdf':
-            from pdfminer.high_level import extract_text
-            return extract_text(io.BytesIO(content))
-        elif file_type in ['doc', 'docx']:
-            from docx import Document
-            doc = Document(io.BytesIO(content))
-            return "\n".join([para.text for para in doc.paragraphs])
-        elif file_type in ['xls', 'xlsx']:
-            from openpyxl import load_workbook
-            wb = load_workbook(io.BytesIO(content))
-            text = ""
-            for sheet in wb:
-                for row in sheet.iter_rows(values_only=True):
-                    text += " | ".join([str(cell) for cell in row if cell]) + "\n"
-            return text
-        elif file_type in ['ppt', 'pptx']:
-            from pptx import Presentation
-            prs = Presentation(io.BytesIO(content))
-            text = ""
-            for slide in prs.slides:
-                for shape in slide.shapes:
-                    if hasattr(shape, 'text'):
-                        text += shape.text + "\n"
-            return text
-        elif file_type in ['png', 'jpg', 'jpeg']:
-            import pytesseract
-            from PIL import Image
-            image = Image.open(io.BytesIO(content))
-            return pytesseract.image_to_string(image)
-        else:
-            return content.decode('utf-8', errors='ignore')
+        import os
+        nltk_data_dir = os.path.expanduser('~/nltk_data')
+        os.makedirs(nltk_data_dir, exist_ok=True)
+        nltk.download('punkt', quiet=True, download_dir=nltk_data_dir)
+        nltk.download('punkt_tab', quiet=True, download_dir=nltk_data_dir)
+        nltk.download('stopwords', quiet=True, download_dir=nltk_data_dir)
     except Exception as e:
-        logging.error(f"Error extracting text from {file_type} file: {str(e)}")
-        logging.error(traceback.format_exc())
-        raise Exception(f"Error extracting text from {file_type} file: {str(e)}")
+        logging.error(f"Failed to create NLTK data directory and download data: {e}")
 
-def progress_callback(progress):
-    socketio.emit('summarization_progress', {'type': 'progress', 'progress': progress})
+class SummarizationModel:
+    def __init__(self, model_name: str = "facebook/bart-large-cnn"):
+        # ... (existing code)
 
-@app.route('/summarize', methods=['POST'])
-def summarize():
-    try:
-        data = request.get_json()
-        if not data:
-            return jsonify({'error': 'No JSON data received'}), 400
+    def clean_text(self, text: str) -> str:
+        # ... (existing code)
 
-        merge_summaries = data.get('merge_summaries', False)
-        summary_depth = float(data.get('summary_depth', 0.3))
-        language = data.get('language', 'en')
-        documents_data = data.get('documents', [])
+    def preprocess_text(self, text: str) -> str:
+        # ... (existing code)
 
-        if not documents_data:
-            return jsonify({'error': 'No documents provided'}), 400
+    def optimize_length_params(self, text: str, summary_depth: float = 0.3) -> tuple[int, int]:
+        # ... (existing code)
 
-        documents = []
-        for doc in documents_data:
+    def generate_summary(self, text: str, summary_depth: float = 0.3, mode: str = 'default') -> Optional[str]:
+        try:
+            start_time = time.time()
+
+            # Input validation and preprocessing
+            cleaned_text = self.preprocess_text(text)
+            if not cleaned_text:
+                return "Input text is empty after preprocessing."
+
+            word_count = len(cleaned_text.split())
+            logging.info(f"Preprocessed text word count: {word_count}")
+
+            if word_count < self.min_chunk_size:
+                logging.info(f"Text too short for summarization (word count: {word_count}). Returning as is.")
+                return cleaned_text
+
+            # Check cache first
+            cache_key = f"{cleaned_text[:100]}_{summary_depth}_{mode}"
+            with self.lock:
+                cached_result = self.cache.get(cache_key)
+                if cached_result:
+                    return cached_result
+
+            # Get optimized length parameters
+            max_length, min_length = self.optimize_length_params(cleaned_text, summary_depth)
+            logging.info(f"Summary parameters - max_length: {max_length}, min_length: {min_length}")
+
             try:
-                text = extract_text_from_document(doc['content'], doc['type'])
-                documents.append({
-                    'name': doc['name'],
-                    'content': text,
-                    'type': doc['type']
-                })
+                # Generate summary with optimized parameters and error handling
+                if mode == 'incremental':
+                    summaries = self.summarizer(
+                        cleaned_text,
+                        max_length=max_length,
+                        min_length=min_length,
+                        do_sample=True,
+                        num_beams=4,
+                        temperature=0.7,
+                        top_k=50,
+                        top_p=0.95,
+                        early_stopping=True,
+                        no_repeat_ngram_size=3,
+                        batch_size=self.batch_size,
+                        return_text=True,
+                        num_return_sequences=1
+                    )
+                    result = summaries[0]['summary_text']
+                else:
+                    summary = self.summarizer(
+                        cleaned_text,
+                        max_length=max_length,
+                        min_length=min_length,
+                        do_sample=True,
+                        num_beams=4,
+                        temperature=0.7,
+                        top_k=50,
+                        top_p=0.95,
+                        early_stopping=True,
+                        no_repeat_ngram_size=3,
+                        batch_size=self.batch_size,
+                        return_text=True
+                    )
+                    if isinstance(summary, list) and len(summary) > 0:
+                        result = summary[0].get('summary_text', '').strip()
+                    else:
+                        result = cleaned_text[:max_length]
+
             except Exception as e:
-                logging.error(f"Error processing document {doc['name']}: {str(e)}")
-                logging.error(traceback.format_exc())
-                return jsonify({'error': f"Error processing document {doc['name']}: {str(e)}"}), 400
+                logging.error(f"Error in summarizer pipeline: {str(e)}")
+                result = cleaned_text[:max_length]
 
-        summaries = summarize_documents(
-            summarization_model, 
-            documents, 
-            merge_summaries, 
-            summary_depth, 
-            language, 
-            progress_callback
-        )
-        
-        enriched_summaries = [enrich_summary_with_visuals(summary) for summary in summaries]
-        
-        pdf_summaries = []
-        for summary in enriched_summaries:
-            try:
-                pdf_content = convert_summary_to_pdf(summary['content'])
-                pdf_base64 = base64.b64encode(pdf_content).decode('utf-8')
-                pdf_summaries.append({
-                    'title': summary['title'],
-                    'content': pdf_base64
-                })
-            except Exception as e:
-                logging.error(f"Error converting summary to PDF: {str(e)}")
-                pdf_summaries.append({
-                    'title': summary['title'],
-                    'content': summary['content']
-                })
-        
-        return jsonify({'summaries': pdf_summaries}), 200
+            # Check timeout
+            if time.time() - start_time > 60:  # Timeout after 1 minute
+                logging.warning("Summary generation timed out")
+                return cleaned_text[:max_length]
 
-    except Exception as e:
-        logging.error(f"Error in summarize route: {str(e)}")
-        logging.error(traceback.format_exc())
-        return jsonify({'error': str(e)}), 500
+            if not result:
+                logging.warning("Generated summary is empty")
+                return cleaned_text[:max_length]
 
-@socketio.on('connect')
-def handle_connect():
-    logging.info('Client connected')
-    emit('connected', {'data': 'Connected'})
+            # Post-process summary
+            result = re.sub(r'\s+', ' ', result)
+            result = result.replace(' .', '.').replace(' ,', ',')
 
-@socketio.on('disconnect')
-def handle_disconnect():
-    logging.info('Client disconnected')
+            logging.info(f"Summary generated successfully (word count: {len(result.split())})")
 
-@app.route('/feedback', methods=['POST'])
-def feedback():
-    data = request.json
-    summary_id = data.get('summary_id')
-    user_id = data.get('user_id')
-    feedback_text = data.get('feedback')
+            # Cache the result
+            with self.lock:
+                self.cache[cache_key] = result
 
-    if not all([summary_id, user_id, feedback_text]):
-        return jsonify({'error': 'Missing required data'}), 400
+            return result
 
-    try:
-        # Here you would typically update the model based on the feedback
-        return jsonify({'message': 'Feedback received successfully'}), 200
-    except Exception as e:
-        logging.error(f"Error in feedback route: {str(e)}")
-        logging.error(traceback.format_exc())
-        return jsonify({'error': str(e)}), 500
+        except Exception as e:
+            logging.error(f"Error in generate_summary: {str(e)}")
+            return text[:1024]
 
-if __name__ == '__main__':
-    socketio.run(app, debug=False, host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))
+    def chunk_text(self, text: str) -> List[str]:
+        # ... (existing code)
+
+    def summarize_long_document(self, text: str, summary_depth: float = 0.3, max_time: int = 300) -> str:
+        # ... (existing code)
+
+    def __call__(self, text: str, summary_depth: float = 0.3, mode: str = 'default') -> str:
+        try:
+            word_count = len(text.split())
+            if word_count > self.max_chunk_size:
+                return self.summarize_long_document(text, summary_depth)
+            return self.generate_summary(text, summary_depth, mode)
+        except Exception as e:
+            logging.error(f"Error in __call__ method: {str(e)}")
+            return f"Error summarizing text: {str(e)}"
+
+# Singleton instance with thread-safe lazy loading
+_model_lock = Lock()
+_summarization_model = None
+
+def get_model():
+    # ... (existing code)
