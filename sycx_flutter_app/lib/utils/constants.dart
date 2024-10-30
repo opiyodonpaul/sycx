@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-const String baseUrl = 'http://10.0.2.2:5000';
-// const String baseUrl = 'https://sycx.up.railway.app';
+// const String baseUrl = 'http://10.0.2.2:5000';
+const String baseUrl = 'https://sycx.up.railway.app';
 
 class AppColors {
   static const Color gradientStart = Color(0xFF6A11CB);
