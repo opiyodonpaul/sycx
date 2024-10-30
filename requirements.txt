@@ -16,3 +16,4 @@ markdown
 reportlab
 wordcloud
 matplotlib
+gunicorn
