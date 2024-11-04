@@ -17,3 +17,4 @@ reportlab
 wordcloud
 matplotlib
 gunicorn
+accelerate
