@@ -10,6 +10,7 @@ import string
 import re
 import markdown
 import logging
+from logging.handlers import RotatingFileHandler  #tport for logging rotation
 from io import BytesIO
 from PIL import Image
 import base64
