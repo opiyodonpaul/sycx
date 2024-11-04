@@ -9,6 +9,7 @@ import base64
 import io
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import logging
+from logging.handlers import RotatingFileHandler  #tport for logging rotation
 import json
 import traceback
 from cachetools import TTLCache, LRUCache
