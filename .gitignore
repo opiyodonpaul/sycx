@@ -53,3 +53,7 @@ api.log
 *.pt
 *.pth
 model_checkpoints/
+
+# Logs and Cache
+logs/
+model_cache/
