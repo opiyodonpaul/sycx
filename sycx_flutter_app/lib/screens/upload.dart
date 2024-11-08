@@ -12,15 +12,11 @@ import 'package:sycx_flutter_app/utils/constants.dart';
 import 'package:sycx_flutter_app/widgets/animated_button.dart';
 import 'package:sycx_flutter_app/widgets/custom_app_bar.dart';
 import 'package:sycx_flutter_app/widgets/custom_bottom_nav_bar.dart';
+import 'package:sycx_flutter_app/widgets/loading.dart';
 import 'package:sycx_flutter_app/widgets/padded_round_slider_value_indicator_shape.dart';
 import 'package:dotted_border/dotted_border.dart';
 import 'package:syncfusion_flutter_pdfviewer/pdfviewer.dart';
-import 'package:video_player/video_player.dart';
-import 'package:chewie/chewie.dart';
-import 'package:audioplayers/audioplayers.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:web_socket_channel/web_socket_channel.dart';
-import 'package:path/path.dart' as path;
 
 class Upload extends StatefulWidget {
   const Upload({super.key});
@@ -38,7 +34,6 @@ class UploadState extends State<Upload> with TickerProviderStateMixin {
   late AnimationController _loadingAnimationController;
   late AnimationController _deleteAnimationController;
   late AnimationController _previewAnimationController;
-  double _progress = 0.0;
   String _selectedLanguage = 'English';
   final List<String> _languages = [
     'English',
@@ -48,20 +43,14 @@ class UploadState extends State<Upload> with TickerProviderStateMixin {
     'German',
     'Chinese',
   ];
-  final String _currentStepName = '';
   PlatformFile? _previewFile;
-  bool _mergeSummaries = false;
-  WebSocketChannel? _channel;
   dynamic _filePreviewContent;
-  final int _totalSteps = 0;
-  final int _currentStep = 0;
-  VideoPlayerController? _videoPlayerController;
-  ChewieController? _chewieController;
-  AudioPlayer? _audioPlayer;
   PdfViewerController? _pdfViewerController;
 
   int _currentPdfPage = 1;
   int _totalPdfPages = 0;
+
+  static int maxFileSize = 1024 * 1024 * 1024; // 1GB
 
   @override
   void initState() {
@@ -87,7 +76,6 @@ class UploadState extends State<Upload> with TickerProviderStateMixin {
     // Get the current user's ID
     currentUserId = FirebaseAuth.instance.currentUser?.uid;
     CustomBottomNavBar.updateLastMainRoute('/upload');
-    connectWebSocket();
   }
 
   @override
@@ -96,11 +84,7 @@ class UploadState extends State<Upload> with TickerProviderStateMixin {
     _loadingAnimationController.dispose();
     _deleteAnimationController.dispose();
     _previewAnimationController.dispose();
-    _videoPlayerController?.dispose();
-    _chewieController?.dispose();
-    _audioPlayer?.dispose();
     _pdfViewerController?.dispose();
-    _channel?.sink.close();
     super.dispose();
   }
 
@@ -126,68 +110,35 @@ class UploadState extends State<Upload> with TickerProviderStateMixin {
     );
 
     if (result != null) {
+      int totalSize = result.files.fold(0, (sum, file) => sum + (file.size));
+      if (totalSize > maxFileSize) {
+        Fluttertoast.showToast(
+          msg:
+              "Total file size exceeds 1GB limit. Please reduce the size or number of files.",
+          toastLength: Toast.LENGTH_LONG,
+          gravity: ToastGravity.BOTTOM,
+          backgroundColor: AppColors.gradientMiddle,
+          textColor: Colors.white,
+        );
+        return;
+      }
+
       setState(() {
-        uploadedFiles.addAll(result.files as Iterable<PlatformFile>);
+        uploadedFiles.addAll(result.files);
       });
     }
   }
 
   void removeFile(int index) {
-    _deleteAnimationController.forward(from: 0).then((_) {
-      setState(() {
-        uploadedFiles.removeAt(index);
-      });
-      _deleteAnimationController.reverse();
+    setState(() {
+      uploadedFiles.removeAt(index);
     });
   }
 
-  void connectWebSocket() {
+  Future<String> encodeFileToBase64(PlatformFile file) async {
     try {
-      _channel = WebSocketChannel.connect(
-        Uri.parse('ws://127.0.0.1:5000/socket.io/?EIO=4&transport=websocket'),
-      );
-      _channel!.stream.listen(
-        (message) {
-          try {
-            if (message.startsWith('42["summarization_progress",')) {
-              final data = jsonDecode(message.substring(2));
-              if (data[1]['type'] == 'progress') {
-                setState(() {
-                  _progress = data[1]['progress'] / 100;
-                });
-              }
-            }
-          } catch (e) {
-            print('Error parsing WebSocket message: $e');
-          }
-        },
-        onError: (error) {
-          print('WebSocket error: $error');
-          reconnectWebSocket();
-        },
-        onDone: () {
-          print('WebSocket connection closed');
-          reconnectWebSocket();
-        },
-      );
-    } catch (e) {
-      print('Error connecting to WebSocket: $e');
-      Future.delayed(const Duration(seconds: 5), reconnectWebSocket);
-    }
-  }
-
-  void reconnectWebSocket() {
-    if (!mounted) return;
-    Future.delayed(const Duration(seconds: 5), () {
-      if (mounted) connectWebSocket();
-    });
-  }
-
-  Future<String> encodeFileToBase64(File file) async {
-    try {
-      List<int> fileBytes = await file.readAsBytes();
-      String base64String = base64Encode(fileBytes);
-      return base64String;
+      final bytes = await File(file.path!).readAsBytes();
+      return base64Encode(bytes);
     } catch (e) {
       throw Exception('Error encoding file: $e');
     }
@@ -199,8 +150,12 @@ class UploadState extends State<Upload> with TickerProviderStateMixin {
       return;
     }
 
+    if (currentUserId == null) {
+      Fluttertoast.showToast(msg: "User not authenticated");
+      return;
+    }
+
     setState(() {
-      _progress = 0.0;
       isLoading = true;
     });
     _loadingAnimationController.forward();
@@ -209,32 +164,22 @@ class UploadState extends State<Upload> with TickerProviderStateMixin {
       List<Map<String, dynamic>> documents = [];
       for (var file in uploadedFiles) {
         try {
-          if (file.path == null) continue; // Skip files with null paths
-
-          final base64Content = await encodeFileToBase64(File(file.path!));
-          final fileExtension =
-              path.extension(file.path!).toLowerCase().replaceAll('.', '');
-
+          final base64Content = await encodeFileToBase64(file);
           documents.add({
-            'name': path.basename(file.path!),
+            'name': file.name,
             'content': base64Content,
-            'type': fileExtension,
+            'type': file.extension ?? '',
           });
         } catch (e) {
-          throw Exception('Error processing file ${file.path}: $e');
+          throw Exception('Error processing file ${file.name}: $e');
         }
       }
 
-      final summaryResult = await SummaryService.summarizeDocuments(
+      final summaries = await SummaryService.summarizeDocuments(
         documents,
-        _mergeSummaries,
         summaryDepth,
         _selectedLanguage,
-        (progress) {
-          setState(() {
-            _progress = progress;
-          });
-        },
+        currentUserId!,
       );
 
       setState(() {
@@ -243,7 +188,7 @@ class UploadState extends State<Upload> with TickerProviderStateMixin {
       _loadingAnimationController.reverse();
 
       if (mounted) {
-        Navigator.pushNamed(context, '/summaries', arguments: summaryResult);
+        Navigator.pushNamed(context, '/summaries', arguments: summaries);
       }
     } catch (e) {
       setState(() {
@@ -314,37 +259,6 @@ class UploadState extends State<Upload> with TickerProviderStateMixin {
           _filePreviewContent = content;
         });
         break;
-      case 'mp4':
-      case 'mov':
-      case 'avi':
-        _videoPlayerController = VideoPlayerController.file(File(file.path!));
-        await _videoPlayerController!.initialize();
-        _chewieController = ChewieController(
-          videoPlayerController: _videoPlayerController!,
-          autoPlay: false,
-          looping: false,
-        );
-        setState(() {
-          _filePreviewContent = _chewieController;
-        });
-        break;
-      case 'mp3':
-      case 'wav':
-      case 'ogg':
-        _audioPlayer = AudioPlayer();
-        await _audioPlayer!.setSource(DeviceFileSource(file.path!));
-        setState(() {
-          _filePreviewContent = _audioPlayer;
-        });
-        break;
-      case 'zip':
-      case 'rar':
-      case '7z':
-        setState(() {
-          _filePreviewContent =
-              "Preview not available for compressed files. Please extract the contents to view.";
-        });
-        break;
       default:
         setState(() {
           _filePreviewContent = "Preview not available for this file type.";
@@ -364,7 +278,7 @@ class UploadState extends State<Upload> with TickerProviderStateMixin {
       body: Stack(
         children: [
           _buildMainContent(),
-          if (isLoading) _buildLoadingOverlay(),
+          if (isLoading) const Loading(),
           if (_previewFile != null) _buildPreviewOverlay(),
         ],
       ),
@@ -552,30 +466,6 @@ class UploadState extends State<Upload> with TickerProviderStateMixin {
         child: Image.file(
           _filePreviewContent as File,
           fit: BoxFit.contain,
-        ),
-      );
-    } else if (_filePreviewContent is ChewieController) {
-      return Chewie(controller: _filePreviewContent as ChewieController);
-    } else if (_filePreviewContent is AudioPlayer) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            IconButton(
-              icon: Icon(_filePreviewContent.state == PlayerState.playing
-                  ? Icons.pause
-                  : Icons.play_arrow),
-              onPressed: () {
-                if (_filePreviewContent.state == PlayerState.playing) {
-                  _filePreviewContent.pause();
-                } else {
-                  _filePreviewContent.resume();
-                }
-                setState(() {});
-              },
-            ),
-            Text('Audio Player', style: AppTextStyles.bodyTextStyle),
-          ],
         ),
       );
     } else if (_previewFile!.extension?.toLowerCase() == 'svg') {
@@ -766,64 +656,6 @@ class UploadState extends State<Upload> with TickerProviderStateMixin {
     );
   }
 
-  Widget _buildLoadingOverlay() {
-    return AnimatedBuilder(
-      animation: _loadingAnimationController,
-      builder: (context, child) {
-        return Opacity(
-          opacity: _loadingAnimationController.value,
-          child: Container(
-            color: Colors.black.withOpacity(0.5),
-            child: Center(
-              child: Card(
-                color: AppColors.textFieldFillColor.withOpacity(0.9),
-                child: Padding(
-                  padding: const EdgeInsets.all(20),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      CircularProgressIndicator(
-                        value: _progress,
-                        backgroundColor:
-                            AppColors.secondaryTextColor.withOpacity(0.3),
-                        valueColor: AlwaysStoppedAnimation<Color>(
-                          Color.lerp(AppColors.gradientStart,
-                              AppColors.gradientEnd, _progress)!,
-                        ),
-                      ),
-                      const SizedBox(height: 20),
-                      Text(
-                        '${(_progress * 100).toStringAsFixed(0)}%',
-                        style: TextStyle(
-                          color: Color.lerp(AppColors.gradientStart,
-                              AppColors.gradientEnd, _progress),
-                          fontFamily: AppTextStyles.titleStyle.fontFamily,
-                          fontSize: AppTextStyles.titleStyle.fontSize,
-                          fontWeight: AppTextStyles.titleStyle.fontWeight,
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      Text(
-                        _currentStepName,
-                        style: AppTextStyles.bodyTextStyle,
-                      ),
-                      const SizedBox(height: 10),
-                      Text(
-                        'Step $_currentStep of $_totalSteps',
-                        style:
-                            AppTextStyles.bodyTextStyle.copyWith(fontSize: 14),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
-        );
-      },
-    );
-  }
-
   Widget _buildMainContent() {
     return SingleChildScrollView(
       physics: const AlwaysScrollableScrollPhysics(),
@@ -845,8 +677,6 @@ class UploadState extends State<Upload> with TickerProviderStateMixin {
                 _buildSummarizationPreferences(),
                 const SizedBox(height: defaultMargin),
                 _buildLanguageSelector(),
-                const SizedBox(height: defaultMargin),
-                _buildMergeSummariesToggle(),
                 const SizedBox(height: defaultMargin),
                 _buildSummarizeButton(),
               ],
@@ -1093,7 +923,7 @@ class UploadState extends State<Upload> with TickerProviderStateMixin {
                         size: 48, color: AppColors.gradientStart),
                     const SizedBox(height: 16),
                     Text(
-                      'Drag & Drop or Click to Upload',
+                      'Click to Upload',
                       style: AppTextStyles.bodyTextStyle.copyWith(
                         color: AppColors.textFieldFillColor,
                         fontWeight: FontWeight.bold,
@@ -1101,7 +931,7 @@ class UploadState extends State<Upload> with TickerProviderStateMixin {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      'Supports all file types',
+                      'Supports multiple file types',
                       style: AppTextStyles.bodyTextStyle.copyWith(
                         color: AppColors.textFieldFillColor,
                         fontSize: 12,
@@ -1283,49 +1113,6 @@ class UploadState extends State<Upload> with TickerProviderStateMixin {
     );
   }
 
-  Widget _buildMergeSummariesToggle() {
-    return AnimatedBuilder(
-      animation: _animationController,
-      builder: (context, child) {
-        return Transform.translate(
-          offset: Tween<Offset>(
-            begin: const Offset(0, 50),
-            end: Offset.zero,
-          )
-              .animate(CurvedAnimation(
-                  parent: _animationController,
-                  curve: const Interval(0.95, 1.0, curve: Curves.easeOut)))
-              .value,
-          child: Opacity(
-            opacity: Tween<double>(begin: 0.0, end: 1.0)
-                .animate(CurvedAnimation(
-                    parent: _animationController,
-                    curve: const Interval(0.95, 1.0, curve: Curves.easeOut)))
-                .value,
-            child: child,
-          ),
-        );
-      },
-      child: SwitchListTile(
-        title: Text(
-          'Merge Summaries',
-          style: AppTextStyles.titleStyle
-              .copyWith(color: AppColors.primaryTextColorDark),
-        ),
-        value: _mergeSummaries,
-        onChanged: (bool value) {
-          setState(() {
-            _mergeSummaries = value;
-          });
-        },
-        activeColor: AppColors.gradientStart,
-        activeTrackColor: AppColors.gradientEnd,
-        inactiveThumbColor: AppColors.secondaryTextColor,
-        inactiveTrackColor: AppColors.gradientMiddle,
-      ),
-    );
-  }
-
   Widget _buildSummarizeButton() {
     return AnimatedBuilder(
       animation: _animationController,
@@ -1401,48 +1188,8 @@ class UploadState extends State<Upload> with TickerProviderStateMixin {
       case 'ppt':
       case 'pptx':
         return Icons.slideshow;
-      case 'zip':
-      case 'rar':
-      case '7z':
-        return Icons.folder_zip;
       case 'txt':
         return Icons.text_snippet;
-      case 'py':
-        return Icons.code;
-      case 'html':
-      case 'htm':
-        return Icons.html;
-      case 'css':
-        return Icons.css;
-      case 'js':
-        return Icons.javascript;
-      case 'json':
-        return Icons.data_object;
-      case 'xml':
-        return Icons.code;
-      case 'java':
-        return Icons.coffee;
-      case 'cpp':
-      case 'c':
-        return Icons.code;
-      case 'swift':
-        return Icons.smartphone;
-      case 'kt':
-        return Icons.android;
-      case 'rb':
-        return Icons.code;
-      case 'php':
-        return Icons.php;
-      case 'sql':
-        return Icons.storage;
-      case 'mp3':
-      case 'wav':
-      case 'ogg':
-        return Icons.audio_file;
-      case 'mp4':
-      case 'avi':
-      case 'mov':
-        return Icons.video_file;
       case 'jpg':
       case 'jpeg':
       case 'png':
