@@ -2,6 +2,7 @@ from transformers import pipeline, AutoTokenizer, AutoModelForSeq2SeqLM, AutoMod
 import torch
 import nltk
 import logging
+from logging.handlers import RotatingFileHandler  # Added this import
 from typing import Optional, List, Dict, Union
 import os
 from dotenv import load_dotenv
@@ -18,10 +19,21 @@ load_dotenv()
 HUGGINGFACE_API_KEY = os.getenv('HUGGINGFACE_API_KEY')
 MAX_MEMORY_MB = int(os.getenv('MAX_MEMORY_MB', '512'))
 
+# Create logs directory if it doesn't exist
+os.makedirs('logs', exist_ok=True)
+
 # Configure logging with more detailed format
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - [%(filename)s:%(lineno)d] - %(message)s'
+    format='%(asctime)s - %(levelname)s - [%(filename)s:%(lineno)d] - %(message)s',
+    handlers=[
+        RotatingFileHandler(
+            'logs/summary.log',  # Changed path to logs directory
+            maxBytes=1024*1024,
+            backupCount=3
+        ),
+        logging.StreamHandler()  # Added console output
+    ]
 )
 
 class MemoryManager:
