@@ -3,24 +3,23 @@ import 'package:http/http.dart' as http;
 import 'package:sycx_flutter_app/services/api_client.dart';
 import 'package:sycx_flutter_app/services/database.dart';
 import 'package:sycx_flutter_app/utils/secure_storage.dart';
+import 'package:sycx_flutter_app/models/summary.dart';
 
 class SummaryService {
   static final ApiClient apiClient = ApiClient(httpClient: http.Client());
   static final Database database = Database();
 
-  static Future<List<Map<String, dynamic>>> summarizeDocuments(
-    List<Map<String, dynamic>> documents,
-    bool mergeSummaries,
-    double summaryDepth,
-    String language,
-    Function(double) updateProgress,
-  ) async {
+  static Future<List<Summary>> summarizeDocuments(
+      List<Map<String, dynamic>> documents,
+      double summaryDepth,
+      String language,
+      String userId,
+      ) async {
     try {
       final url = apiClient.buildUri('/summarize');
 
       // Prepare the JSON payload
       final payload = {
-        'merge_summaries': mergeSummaries,
         'summary_depth': summaryDepth,
         'language': language,
         'documents': documents,
@@ -35,32 +34,38 @@ class SummaryService {
       // Send the request with a timeout of 5 minutes
       final response = await http
           .post(
-            url,
-            headers: headers,
-            body: jsonEncode(payload),
-          )
+        url,
+        headers: headers,
+        body: jsonEncode(payload),
+      )
           .timeout(const Duration(minutes: 5));
 
       if (response.statusCode == 200) {
         final jsonResponse = jsonDecode(response.body);
 
         // Process and decode any base64 encoded data in the response
-        final summaries =
-            List<Map<String, dynamic>>.from(jsonResponse['summaries'])
-                .map((summary) {
-          if (summary.containsKey('visuals')) {
-            summary['visuals'] =
-                List<Map<String, dynamic>>.from(summary['visuals'])
-                    .map((visual) {
-              if (visual.containsKey('data') && visual['data'] is String) {
-                // Decode base64 data back to bytes
-                visual['data'] = base64Decode(visual['data']);
-              }
-              return visual;
-            }).toList();
-          }
-          return summary;
+        final summaries = (jsonResponse['summaries'] as List).map((summary) {
+          final originalDocuments = documents
+              .map((doc) => OriginalDocument(
+            title: doc['name'],
+            content: doc['content'],
+          ))
+              .toList();
+
+          return Summary(
+            id: DateTime.now().millisecondsSinceEpoch.toString(),
+            userId: userId,
+            originalDocuments: originalDocuments,
+            summaryContent: summary['content'],
+            createdAt: DateTime.now(),
+            updatedAt: DateTime.now(),
+          );
         }).toList();
+
+        // Save summaries to Firebase
+        for (var summary in summaries) {
+          await database.createSummary(summary);
+        }
 
         return summaries;
       } else {
