@@ -10,7 +10,7 @@ import string
 import re
 import markdown
 import logging
-from logging.handlers import RotatingFileHandler  #tport for logging rotation
+from logging.handlers import RotatingFileHandler
 from io import BytesIO
 from PIL import Image
 import base64
@@ -30,13 +30,20 @@ import gc
 import weakref
 from functools import lru_cache
 
-# Configure logging with rotation
+# Create logs directory if it doesn't exist
+os.makedirs('logs', exist_ok=True)
+
+# Configure logging with more detailed format
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s',
+    format='%(asctime)s - %(levelname)s - [%(filename)s:%(lineno)d] - %(message)s',
     handlers=[
-        logging.RotatingFileHandler('summary.log', maxBytes=1024*1024, backupCount=3),
-        logging.StreamHandler()
+        RotatingFileHandler(
+            'logs/summary.log',  # Changed path to logs directory
+            maxBytes=1024*1024,
+            backupCount=3
+        ),
+        logging.StreamHandler()  # Added console output
     ]
 )
 

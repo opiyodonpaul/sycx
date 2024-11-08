@@ -2,7 +2,7 @@ from transformers import pipeline, AutoTokenizer, AutoModelForSeq2SeqLM, AutoMod
 import torch
 import nltk
 import logging
-from logging.handlers import RotatingFileHandler  # Added this import
+from logging.handlers import RotatingFileHandler
 from typing import Optional, List, Dict, Union
 import os
 from dotenv import load_dotenv

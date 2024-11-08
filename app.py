@@ -9,7 +9,7 @@ import base64
 import io
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import logging
-from logging.handlers import RotatingFileHandler  #tport for logging rotation
+from logging.handlers import RotatingFileHandler
 import json
 import traceback
 from cachetools import TTLCache, LRUCache
@@ -45,15 +45,20 @@ app.wsgi_app = ProxyFix(app.wsgi_app)
 app.config['MAX_CONTENT_LENGTH'] = 100 * 1024 * 1024  # Reduce to 100MB max
 app.config['UPLOAD_CHUNK_SIZE'] = 4 * 1024 * 1024  # 4MB chunks
 
-# Configure logging with rotation
+# Create logs directory if it doesn't exist
+os.makedirs('logs', exist_ok=True)
+
+# Configure logging with more detailed format
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s',
+    format='%(asctime)s - %(levelname)s - [%(filename)s:%(lineno)d] - %(message)s',
     handlers=[
-        logging.handlers.RotatingFileHandler(
-            'app.log', maxBytes=10*1024*1024, backupCount=3
+        RotatingFileHandler(
+            'logs/summary.log',  # Changed path to logs directory
+            maxBytes=1024*1024,
+            backupCount=3
         ),
-        logging.StreamHandler()
+        logging.StreamHandler()  # Added console output
     ]
 )
 
