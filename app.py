@@ -15,7 +15,7 @@ import traceback
 from cachetools import TTLCache, LRUCache
 import nltk
 import gc
-from werkzeug.contrib.fixers import ProxyFix
+from werkzeug.middleware.proxy_fix import ProxyFix
 from functools import lru_cache
 import psutil
 import resource
