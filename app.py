@@ -40,10 +40,27 @@ download_nltk_data()
 
 load_dotenv()
 
-app = Flask(__name__)
-app.wsgi_app = ProxyFix(app.wsgi_app)
-app.config['MAX_CONTENT_LENGTH'] = 100 * 1024 * 1024  # Reduce to 100MB max
-app.config['UPLOAD_CHUNK_SIZE'] = 4 * 1024 * 1024  # 4MB chunks
+def create_app():
+    app = Flask(__name__)
+    app.wsgi_app = ProxyFix(app.wsgi_app)
+    
+    # Move all your existing configurations here
+    app.config['MAX_CONTENT_LENGTH'] = 100 * 1024 * 1024
+    app.config['UPLOAD_CHUNK_SIZE'] = 4 * 1024 * 1024
+    
+    # Initialize extensions
+    limiter.init_app(app)
+    
+    # Register routes and error handlers
+    # (keep your existing route definitions)
+    
+    return app
+
+# Move the executor and cache definitions outside create_app
+executor = ThreadPoolExecutor(max_workers=3)
+cache = TTLCache(maxsize=100, ttl=3600)
+file_cache = LRUCache(maxsize=50)
+limiter = Limiter(key_func=get_remote_address)
 
 # Create logs directory if it doesn't exist
 os.makedirs('logs', exist_ok=True)
@@ -152,6 +169,10 @@ def process_document_chunk(doc):
     except Exception as e:
         logging.error(f"Error processing document {doc['name']}: {str(e)}")
         return None
+
+@app.route('/health', methods=['GET'])
+def health_check():
+    return jsonify({'status': 'healthy'}), 200
 
 @app.route('/summarize', methods=['POST'])
 @limiter.limit("10 per minute")  # Stricter rate limit
@@ -262,11 +283,12 @@ def handle_500_error(e):
     return jsonify({'error': 'Internal server error', 'details': str(e)}), 500
 
 if __name__ == '__main__':
+    app = create_app()
     port = int(os.environ.get('PORT', 5000))
     app.run(
         debug=False,
         host='0.0.0.0',
         port=port,
         threaded=True,
-        processes=1  # Limit to single process
+        processes=1
     )

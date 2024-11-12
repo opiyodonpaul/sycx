@@ -19,3 +19,4 @@ matplotlib
 gunicorn
 accelerate
 werkzeug
+psutil
