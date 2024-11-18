@@ -94,23 +94,21 @@ def generate_summary(model, documents, summary_depth: float = 0.3, language: str
         total_docs = len(documents)
         if total_docs == 0:
             raise ValueError("No documents provided")
-
+        
         summary = []
         # Limit concurrent threads based on CPU count
         max_workers = min(os.cpu_count() or 1, total_docs)
-
+        
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
             future_summaries = [
                 executor.submit(
-                    model.generate_summary,
+                    model.generate_summary,  # Remove the additional argument
                     doc.get('content', ''),
-                    summary_depth,
-                    language,
-                    'incremental'  # default mode
+                    summary_depth
                 )
                 for doc in documents if doc.get('content')
             ]
-
+            
             for i, future in enumerate(as_completed(future_summaries)):
                 try:
                     doc_summary = future.result()
@@ -124,9 +122,9 @@ def generate_summary(model, documents, summary_depth: float = 0.3, language: str
                 finally:
                     # Clean up completed futures
                     future.cancel()
-
+        
         return summary
-
+    
     except Exception as e:
         logging.error(f"Error in generate_summary: {str(e)}")
         raise

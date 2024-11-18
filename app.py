@@ -130,22 +130,35 @@ def create_app():
                     language
                 )
                 
-                # Process summaries to match Dart frontend expectations
-                processed_summaries = []
+                # Enrich summaries with visuals
+                enriched_summaries = []
                 for summary in summaries:
                     try:
-                        # Just return the content directly without PDF conversion
-                        # since your Dart code expects plain content
-                        processed_summaries.append({
+                        enriched_summary = enrich_summary_with_visuals(summary)
+                        enriched_summaries.append(enriched_summary)
+                    except Exception as e:
+                        logging.error(f"Error enriching summary: {str(e)}")
+                        enriched_summaries.append(summary)
+                    finally:
+                        cleanup_resources()
+                
+                # Convert to PDF
+                pdf_summaries = []
+                for summary in enriched_summaries:
+                    try:
+                        pdf_content = convert_summary_to_pdf(summary['content'])
+                        pdf_base64 = base64.b64encode(pdf_content).decode('utf-8')
+                        pdf_summaries.append({
                             'title': summary['title'],
-                            'content': summary['content']
+                            'content': pdf_base64,
+                            'original_content': summary['content']
                         })
                     except Exception as e:
-                        logging.error(f"Error processing summary: {str(e)}")
-                        processed_summaries.append({
+                        logging.error(f"Error converting to PDF: {str(e)}")
+                        pdf_summaries.append({
                             'title': summary['title'],
-                            'content': 'Error processing summary',
-                            'error': str(e)
+                            'content': summary['content'],
+                            'error': 'PDF conversion failed'
                         })
                     finally:
                         cleanup_resources()
@@ -153,11 +166,11 @@ def create_app():
                 execution_time = time.time() - start_time
                 return jsonify({
                     'status': 'success',
-                    'summaries': processed_summaries,
+                    'summaries': pdf_summaries,
                     'metadata': {
                         'execution_time': f"{execution_time:.2f} seconds",
                         'documents_processed': len(documents),
-                        'summaries_generated': len(processed_summaries)
+                        'summaries_generated': len(pdf_summaries)
                     }
                 }), 200
 
