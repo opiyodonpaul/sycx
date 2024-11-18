@@ -96,22 +96,23 @@ def create_app():
             if not data:
                 return jsonify({'error': 'No JSON data received'}), 400
 
-            merge_summaries = data.get('merge_summaries', False)
+            # Extract parameters matching the Dart frontend parameters
             summary_depth = float(data.get('summary_depth', 0.3))
-            language = data.get('language', 'en')
+            language = data.get('language', 'english')
             documents_data = data.get('documents', [])
 
             if not documents_data:
                 return jsonify({'error': 'No documents provided'}), 400
 
+            # Process documents
             documents = []
             try:
                 for doc in documents_data:
-                    text = extract_text_from_document(doc['content'], doc['type'])
+                    text = extract_text_from_document(doc['content'], doc.get('type', 'text'))
                     documents.append({
                         'name': doc['name'],
                         'content': text,
-                        'type': doc['type']
+                        'type': doc.get('type', 'text')
                     })
             except Exception as e:
                 logging.error(f"Error processing documents: {str(e)}")
@@ -129,35 +130,22 @@ def create_app():
                     language
                 )
                 
-                # Enrich summaries with visuals
-                enriched_summaries = []
+                # Process summaries to match Dart frontend expectations
+                processed_summaries = []
                 for summary in summaries:
                     try:
-                        enriched_summary = enrich_summary_with_visuals(summary)
-                        enriched_summaries.append(enriched_summary)
-                    except Exception as e:
-                        logging.error(f"Error enriching summary: {str(e)}")
-                        enriched_summaries.append(summary)
-                    finally:
-                        cleanup_resources()
-                
-                # Convert to PDF
-                pdf_summaries = []
-                for summary in enriched_summaries:
-                    try:
-                        pdf_content = convert_summary_to_pdf(summary['content'])
-                        pdf_base64 = base64.b64encode(pdf_content).decode('utf-8')
-                        pdf_summaries.append({
+                        # Just return the content directly without PDF conversion
+                        # since your Dart code expects plain content
+                        processed_summaries.append({
                             'title': summary['title'],
-                            'content': pdf_base64,
-                            'original_content': summary['content']
+                            'content': summary['content']
                         })
                     except Exception as e:
-                        logging.error(f"Error converting to PDF: {str(e)}")
-                        pdf_summaries.append({
+                        logging.error(f"Error processing summary: {str(e)}")
+                        processed_summaries.append({
                             'title': summary['title'],
-                            'content': summary['content'],
-                            'error': 'PDF conversion failed'
+                            'content': 'Error processing summary',
+                            'error': str(e)
                         })
                     finally:
                         cleanup_resources()
@@ -165,11 +153,11 @@ def create_app():
                 execution_time = time.time() - start_time
                 return jsonify({
                     'status': 'success',
-                    'summaries': pdf_summaries,
+                    'summaries': processed_summaries,
                     'metadata': {
                         'execution_time': f"{execution_time:.2f} seconds",
                         'documents_processed': len(documents),
-                        'summaries_generated': len(pdf_summaries)
+                        'summaries_generated': len(processed_summaries)
                     }
                 }), 200
 

@@ -98,13 +98,19 @@ def generate_summary(model, documents, summary_depth: float = 0.3, language: str
         summary = []
         # Limit concurrent threads based on CPU count
         max_workers = min(os.cpu_count() or 1, total_docs)
-        
+
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
             future_summaries = [
-                executor.submit(model, doc.get('content', ''), summary_depth, 'incremental') 
+                executor.submit(
+                    model.generate_summary,
+                    doc.get('content', ''),
+                    summary_depth,
+                    language,
+                    'incremental'  # default mode
+                )
                 for doc in documents if doc.get('content')
             ]
-            
+
             for i, future in enumerate(as_completed(future_summaries)):
                 try:
                     doc_summary = future.result()
