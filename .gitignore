@@ -57,3 +57,6 @@ model_checkpoints/
 # Logs and Cache
 logs/
 model_cache/
+
+#nltk_data
+nltk_data
