@@ -11,6 +11,7 @@ import traceback
 import gc
 import time
 
+# Create Flask application factory
 def create_app():
     # Create logs directory if it doesn't exist
     os.makedirs('logs', exist_ok=True)
@@ -235,12 +236,14 @@ def create_app():
 
     return app
 
+# Create the application instance
+app = create_app()
+
 if __name__ == '__main__':
     # Load environment variables
     load_dotenv()
     
-    # Create and run the application
-    app = create_app()
+    # Run the application
     app.run(
         debug=False,
         host='0.0.0.0',

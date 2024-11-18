@@ -60,3 +60,6 @@ model_cache/
 
 #nltk_data
 nltk_data
+
+#test files
+test_files
