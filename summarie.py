@@ -15,6 +15,9 @@ from io import BytesIO
 from PIL import Image
 import base64
 from wordcloud import WordCloud
+import matplotlib
+# Force matplotlib to use non-interactive backend
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
@@ -29,6 +32,8 @@ import time
 import gc
 import weakref
 from functools import lru_cache
+import tempfile
+import atexit
 
 # Create logs directory if it doesn't exist
 os.makedirs('logs', exist_ok=True)
@@ -39,11 +44,11 @@ logging.basicConfig(
     format='%(asctime)s - %(levelname)s - [%(filename)s:%(lineno)d] - %(message)s',
     handlers=[
         RotatingFileHandler(
-            'logs/summary.log',  # Changed path to logs directory
+            'logs/summary.log',
             maxBytes=1024*1024,
             backupCount=3
         ),
-        logging.StreamHandler()  # Added console output
+        logging.StreamHandler()
     ]
 )
 
@@ -61,15 +66,14 @@ def download_nltk_data(timeout=30):
         logging.warning(f"Failed to download NLTK data: {e}")
 
 # Improved cache configuration with size limits
-MAX_CACHE_SIZE = 100  # Limit cache size
-image_cache = LRUCache(maxsize=MAX_CACHE_SIZE)  # Using LRU instead of TTL for better memory management
+MAX_CACHE_SIZE = 100
+image_cache = LRUCache(maxsize=MAX_CACHE_SIZE)
 summary_cache = TTLCache(maxsize=MAX_CACHE_SIZE, ttl=1800)
 
 # Rate limiting with improved reset mechanism
 rate_limits = {
     'unsplash': {'limit': 50, 'interval': timedelta(hours=1), 'count': 0, 'reset': datetime.now()},
-    'pexels': {'limit': 200, 'interval': timedelta(hours=1), 'count': 0, 'reset': datetime.now()},
-    'pixabay': {'limit': 500, 'interval': timedelta(hours=1), 'count': 0, 'reset': datetime.now()}
+    'pexels': {'limit': 200, 'interval': timedelta(hours=1), 'count': 0, 'reset': datetime.now()}
 }
 
 def cleanup_resources():
@@ -89,45 +93,61 @@ def check_rate_limit(api_name):
         return True
     return False
 
+def fetch_with_retries(fetch_func, retries=3, delay=2, *args, **kwargs):
+    for attempt in range(retries):
+        try:
+            return fetch_func(*args, **kwargs)
+        except Exception as e:
+            logging.warning(f"Attempt {attempt + 1} failed: {e}")
+            time.sleep(delay)
+    logging.error("All retry attempts failed.")
+    return []
+
 def generate_summary(model, documents, summary_depth: float = 0.3, language: str = 'english') -> List[dict]:
+    if not documents:
+        return []
+
     try:
         total_docs = len(documents)
         if total_docs == 0:
             raise ValueError("No documents provided")
-        
+
         summary = []
-        # Limit concurrent threads based on CPU count
         max_workers = min(os.cpu_count() or 1, total_docs)
-        
+
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
             future_summaries = [
                 executor.submit(
-                    model.generate_summary,  # Remove the additional argument
+                    model.generate_summary,
                     doc.get('content', ''),
                     summary_depth
                 )
                 for doc in documents if doc.get('content')
             ]
-            
+
             for i, future in enumerate(as_completed(future_summaries)):
                 try:
                     doc_summary = future.result()
-                    if doc_summary:
-                        summary.append({
+                    if doc_summary and i < len(documents):
+                        summary_data = {
                             'title': documents[i].get('name', f'Document {i+1}'),
                             'content': doc_summary
-                        })
+                        }
+                        try:
+                            enriched_summary = enrich_summary_with_visuals(summary_data)
+                            summary.append(enriched_summary)
+                        except Exception as visual_error:
+                            logging.warning(f"Visual enhancement failed: {str(visual_error)}")
+                            summary.append(summary_data)
                 except Exception as e:
                     logging.error(f"Error processing document {i}: {str(e)}")
                 finally:
-                    # Clean up completed futures
                     future.cancel()
-        
+
         return summary
-    
     except Exception as e:
         logging.error(f"Error in generate_summary: {str(e)}")
-        raise
+        return []
     finally:
         cleanup_resources()
 
@@ -165,14 +185,11 @@ def extract_keywords(text):
         return []
         
     try:
-        # Optimize tokenization with batch processing
         tokens = word_tokenize(text.lower())
         stop_words = set(stopwords.words('english') + list(string.punctuation))
         
-        # Use generator expression for memory efficiency
         filtered_tokens = (word for word in tokens if word.isalnum() and word not in stop_words)
         
-        # Get frequency distribution with limited size
         fdist = FreqDist(filtered_tokens)
         
         return [word for word, _ in fdist.most_common(5)]
@@ -187,17 +204,14 @@ def optimize_image(image_data: bytes, max_size: int = 800) -> bytes:
     """Optimize image size while maintaining quality"""
     try:
         with Image.open(BytesIO(image_data)) as img:
-            # Convert to RGB if necessary
             if img.mode in ('RGBA', 'P'):
                 img = img.convert('RGB')
             
-            # Resize if larger than max_size
             if max(img.size) > max_size:
                 ratio = max_size / max(img.size)
                 new_size = tuple(int(dim * ratio) for dim in img.size)
                 img = img.resize(new_size, Image.Resampling.LANCZOS)
             
-            # Optimize output
             output = BytesIO()
             img.save(output, format='JPEG', optimize=True, quality=85)
             return output.getvalue()
@@ -212,12 +226,11 @@ def fetch_images_from_multiple_sources(keywords):
     images = []
     apis = {
         'unsplash': fetch_image_unsplash,
-        'pexels': fetch_image_pexels,
-        'pixabay': fetch_image_pixabay
+        'pexels': fetch_image_pexels
     }
 
     try:
-        with ThreadPoolExecutor(max_workers=3) as executor:
+        with ThreadPoolExecutor(max_workers=2) as executor:
             futures = []
             for keyword in keywords[:1]:
                 for api_name, fetch_func in apis.items():
@@ -226,20 +239,45 @@ def fetch_images_from_multiple_sources(keywords):
                             executor.submit(fetch_images_from_cache_or_api, 
                                           keyword, api_name, fetch_func)
                         )
-            
-            for future in as_completed(futures):
+
+            for future in as_completed(futures, timeout=30):
                 try:
                     result = future.result()
                     if result:
-                        images.extend(result)
+                        # Validate and download images immediately
+                        valid_images = download_and_validate_images(result)
+                        images.extend(valid_images)
                 except Exception as e:
-                    logging.error(f"Error fetching images: {str(e)}")
+                    logging.error(f"Failed to fetch images: {str(e)}")
                 finally:
                     future.cancel()
 
         return images[:3]
+    except Exception as e:
+        logging.error(f"Error in fetch_images_from_multiple_sources: {str(e)}")
+        return []
     finally:
         cleanup_resources()
+
+def download_and_validate_images(image_urls):
+    valid_images = []
+    for url in image_urls:
+        try:
+            if url.startswith('data:image'):
+                # Handle base64 encoded images
+                img_data = base64.b64decode(url.split(',')[1])
+                valid_images.append(url)
+            else:
+                # Download and validate external images
+                response = requests.get(url, timeout=10)
+                response.raise_for_status()
+                img = Image.open(BytesIO(response.content))
+                img.verify()  # Verify image integrity
+                valid_images.append(url)
+        except Exception as e:
+            logging.error(f"Invalid image URL {url}: {str(e)}")
+            continue
+    return valid_images
 
 def fetch_images_from_cache_or_api(keyword, api_name, fetch_func):
     if not keyword:
@@ -252,7 +290,6 @@ def fetch_images_from_cache_or_api(keyword, api_name, fetch_func):
         
         images = fetch_func(keyword)
         if images:
-            # Limit cache size
             if len(image_cache) >= MAX_CACHE_SIZE:
                 image_cache.pop(next(iter(image_cache)))
             image_cache[cache_key] = images
@@ -264,19 +301,30 @@ def fetch_images_from_cache_or_api(keyword, api_name, fetch_func):
 def fetch_image_unsplash(keyword):
     if not os.getenv("UNSPLASH_ACCESS_KEY"):
         return []
-
+    
     try:
+        headers = {
+            'Authorization': f'Client-ID {os.getenv("UNSPLASH_ACCESS_KEY")}',
+            'Accept-Version': 'v1'
+        }
+        
         with requests.Session() as session:
             response = session.get(
-                f'https://api.unsplash.com/photos/random',
-                params={'query': keyword},
-                headers={'Authorization': f'Client-ID {os.getenv("UNSPLASH_ACCESS_KEY")}'},
+                'https://api.unsplash.com/photos/random',
+                params={'query': keyword, 'orientation': 'landscape'},
+                headers=headers,
                 timeout=10
             )
             response.raise_for_status()
-            image_url = response.json()['urls']['small']
-            image_data = session.get(image_url, timeout=10).content
-            optimized_data = optimize_image(image_data)
+            data = response.json()
+            
+            # Get the small version of the image
+            image_url = data['urls']['small']
+            
+            # Validate the URL
+            test_response = session.head(image_url, timeout=5)
+            test_response.raise_for_status()
+            
             return [image_url]
     except Exception as e:
         logging.error(f"Error fetching image from Unsplash: {str(e)}")
@@ -285,53 +333,33 @@ def fetch_image_unsplash(keyword):
 def fetch_image_pexels(keyword):
     if not os.getenv("PEXELS_API_KEY"):
         return []
-
+    
     try:
+        headers = {
+            'Authorization': os.getenv("PEXELS_API_KEY")
+        }
+        
         with requests.Session() as session:
             response = session.get(
-                f'https://api.pexels.com/v1/search',
-                params={'query': keyword, 'per_page': 1},
-                headers={'Authorization': os.getenv("PEXELS_API_KEY")},
+                'https://api.pexels.com/v1/search',
+                params={'query': keyword, 'per_page': 1, 'orientation': 'landscape'},
+                headers=headers,
                 timeout=10
             )
             response.raise_for_status()
             data = response.json()
+            
             if data.get('photos'):
-                image_url = data['photos'][0]['src']['small']
-                image_data = session.get(image_url, timeout=10).content
-                optimized_data = optimize_image(image_data)
+                image_url = data['photos'][0]['src']['medium']
+                
+                # Validate the URL
+                test_response = session.head(image_url, timeout=5)
+                test_response.raise_for_status()
+                
                 return [image_url]
-        return []
+            return []
     except Exception as e:
         logging.error(f"Error fetching image from Pexels: {str(e)}")
-        return []
-
-def fetch_image_pixabay(keyword):
-    if not os.getenv("PIXABAY_API_KEY"):
-        return []
-
-    try:
-        with requests.Session() as session:
-            response = session.get(
-                'https://pixabay.com/api/',
-                params={
-                    'key': os.getenv("PIXABAY_API_KEY"),
-                    'q': keyword,
-                    'image_type': 'photo',
-                    'per_page': 1
-                },
-                timeout=10
-            )
-            response.raise_for_status()
-            data = response.json()
-            if data.get('hits'):
-                image_url = data['hits'][0]['webformatURL']
-                image_data = session.get(image_url, timeout=10).content
-                optimized_data = optimize_image(image_data)
-                return [image_url]
-        return []
-    except Exception as e:
-        logging.error(f"Error fetching image from Pixabay: {str(e)}")
         return []
 
 def generate_wordcloud(text):
@@ -339,33 +367,29 @@ def generate_wordcloud(text):
         return None
 
     try:
-        # Limit text size for wordcloud
         max_text_length = 10000
         truncated_text = text[:max_text_length] if len(text) > max_text_length else text
         
+        # Create word cloud
         wordcloud = WordCloud(
             width=800, 
             height=400, 
             background_color='white',
-            max_words=100  # Limit number of words
+            max_words=100
         ).generate(truncated_text)
         
-        plt.figure(figsize=(10, 5), dpi=100)  # Lower DPI for memory efficiency
-        plt.imshow(wordcloud, interpolation='bilinear')
-        plt.axis('off')
-        
+        # Save to BytesIO buffer
         img_buffer = BytesIO()
-        plt.savefig(img_buffer, format='png', bbox_inches='tight', pad_inches=0, dpi=100)
-        plt.close()
-        
+        wordcloud.to_image().save(img_buffer, format='PNG')
         img_buffer.seek(0)
+        
+        # Convert to base64
         img_str = base64.b64encode(img_buffer.getvalue()).decode()
         return f"data:image/png;base64,{img_str}"
     except Exception as e:
         logging.error(f"Error generating word cloud: {str(e)}")
         return None
     finally:
-        plt.close('all')
         cleanup_resources()
 
 def insert_visuals_into_summary(summary, images, wordcloud):
@@ -376,17 +400,27 @@ def insert_visuals_into_summary(summary, images, wordcloud):
         paragraphs = summary.split('\n\n')
         enriched_paragraphs = []
         
+        # Add wordcloud at the top if available
         if wordcloud:
             enriched_paragraphs.append(f'![Word Cloud]({wordcloud})')
         
+        # Process paragraphs and images
         for i, paragraph in enumerate(paragraphs):
             if paragraph.strip():
                 enriched_paragraphs.append(paragraph)
                 
+                # Add image if available
                 if i < len(images) and images[i]:
-                    enriched_paragraphs.append(
-                        f'\n![Image related to {paragraph[:30].replace("[", "").replace("]", "")}...]({images[i]})\n'
-                    )
+                    try:
+                        # Validate image URL or data URI
+                        image_url = images[i]
+                        if image_url.startswith(('http://', 'https://', 'data:image')):
+                            enriched_paragraphs.append(
+                                f'\n![Image {i+1}]({image_url})\n'
+                            )
+                    except Exception as e:
+                        logging.error(f"Error inserting image {i}: {str(e)}")
+                        continue
         
         return '\n\n'.join(enriched_paragraphs)
     except Exception as e:
@@ -400,75 +434,197 @@ def convert_summary_to_pdf(summary_content):
     try:
         buffer = BytesIO()
         doc = SimpleDocTemplate(
-            buffer, 
+            buffer,
             pagesize=letter,
-            rightMargin=72, 
+            rightMargin=72,
             leftMargin=72,
-            topMargin=72, 
+            topMargin=72,
             bottomMargin=18
         )
         
         styles = getSampleStyleSheet()
-        styles.add(ParagraphStyle(name='Justify', alignment=4))
+        custom_style = ParagraphStyle(
+            'CustomStyle',
+            parent=styles['Normal'],
+            fontSize=11,
+            leading=14,
+            spaceAfter=12,
+            spaceBefore=12
+        )
+        
+        title_style = ParagraphStyle(
+            'TitleStyle',
+            parent=styles['Heading1'],
+            fontSize=24,
+            spaceAfter=30,
+            spaceBefore=30,
+            alignment=1
+        )
+        
+        heading_style = ParagraphStyle(
+            'HeadingStyle',
+            parent=styles['Heading1'],
+            fontSize=16,
+            spaceAfter=12,
+            spaceBefore=24
+        )
         
         story = []
+        story.append(Paragraph("Summary Report", title_style))
+        story.append(Spacer(1, 60))
+
+        # Convert markdown to HTML and clean it up
         html = markdown.markdown(summary_content)
         
-        paragraphs = re.split('<h[1-6]>|</h[1-6]>|<p>|</p>', html)
-        paragraphs = [p.strip() for p in paragraphs if p.strip()]
+        # Process content by type
+        elements = []
+        current_text = ""
         
-        for para in paragraphs:
+        # Split content into images and text
+        for line in summary_content.split('\n'):
+            if line.startswith('!['):
+                if current_text:
+                    elements.append(('text', current_text.strip()))
+                    current_text = ""
+                
+                # Extract image URL
+                img_match = re.search(r'\((.*?)\)', line)
+                if img_match:
+                    elements.append(('image', img_match.group(1)))
+            else:
+                current_text += line + "\n"
+        
+        if current_text:
+            elements.append(('text', current_text.strip()))
+
+        # Create a session for reuse
+        session = requests.Session()
+
+        # Process each element
+        for element_type, content in elements:
             try:
-                if para.startswith('!['):
-                    img_match = re.search(r'\((.*?)\)', para)
-                    if img_match:
-                        img_src = img_match.group(1)
-                        if img_src.startswith('data:image/png;base64,'):
-                            img_data = base64.b64decode(img_src.split(',')[1])
-                            img = ImageReader(BytesIO(img_data))
+                if element_type == 'text':
+                    # Process text content
+                    paragraphs = content.split('\n')
+                    for para in paragraphs:
+                        para = para.strip()
+                        if not para:
+                            continue
+                            
+                        # Handle headings
+                        if para.startswith('#'):
+                            level = len(re.match(r'^#+', para).group())
+                            text = para.lstrip('#').strip()
+                            story.append(Paragraph(text, heading_style))
+                        
+                        # Handle bullet points
+                        elif para.startswith('*') or para.startswith('-'):
+                            text = para.lstrip('*- ').strip()
+                            story.append(Paragraph(
+                                f"• {text}",
+                                ParagraphStyle(
+                                    'BulletStyle',
+                                    parent=custom_style,
+                                    leftIndent=20,
+                                    bulletIndent=10
+                                )
+                            ))
+                        
+                        # Regular paragraphs
                         else:
-                            with requests.Session() as session:
-                                response = session.get(img_src, stream=True, timeout=10)
+                            story.append(Paragraph(para, custom_style))
+                            
+                elif element_type == 'image':
+                    try:
+                        img_data = None
+                        if content.startswith('data:image/png;base64,'):
+                            # Handle base64 encoded images (like wordcloud)
+                            img_data = base64.b64decode(content.split(',')[1])
+                        else:
+                            # Handle URL images
+                            try:
+                                response = session.get(content, stream=True, timeout=10)
                                 response.raise_for_status()
-                                img_data = optimize_image(response.content)
-                                img = ImageReader(BytesIO(img_data))
+                                img_data = response.content
+                            except requests.RequestException as e:
+                                logging.error(f"Error fetching image from URL: {str(e)}")
+                                continue
+
+                        if img_data:
+                            # Create a temporary file for the image
+                            with tempfile.NamedTemporaryFile(delete=False, suffix='.jpg') as tmp_file:
+                                # Process and save the image
+                                img = Image.open(BytesIO(img_data))
+                                
+                                # Convert RGBA to RGB if necessary
+                                if img.mode in ('RGBA', 'P'):
+                                    img = img.convert('RGB')
+                                
+                                # Calculate dimensions
+                                max_width = 6 * inch
+                                img_width, img_height = img.size
+                                aspect = img_height / float(img_width)
+                                
+                                desired_width = min(max_width, img_width)
+                                desired_height = aspect * desired_width
+                                
+                                # Save optimized image
+                                img.save(tmp_file.name, format='JPEG', quality=85)
+                                
+                                # Add image to story
+                                story.append(Spacer(1, 12))
+                                story.append(ReportLabImage(
+                                    tmp_file.name,
+                                    width=desired_width,
+                                    height=desired_height
+                                ))
+                                story.append(Spacer(1, 12))
+                                
+                                # Cleanup
+                                img.close()
+                                
+                                # Schedule file for deletion
+                                atexit.register(lambda: os.unlink(tmp_file.name))
                         
-                        img_width, img_height = img.getSize()
-                        aspect = img_height / float(img_width)
-                        
-                        # Limit maximum image size in PDF
-                        max_width = 6 * inch
-                        img_width = min(max_width, img_width)
-                        img_height = aspect * img_width
-                        
-                        story.append(ReportLabImage(img, width=img_width, height=img_height))
-                        # Force cleanup of image data
-                        del img_data
-                        gc.collect()
-                else:
-                    # Limit paragraph length
-                    max_para_length = 5000
-                    if len(para) > max_para_length:
-                        para = para[:max_para_length] + "..."
-                    story.append(Paragraph(para, styles['Justify']))
-                story.append(Spacer(1, 12))
+                    except Exception as img_error:
+                        logging.error(f"Error processing image in PDF: {str(img_error)}")
+                        continue
+
             except Exception as e:
-                logging.error(f"Error processing paragraph in PDF conversion: {str(e)}")
+                logging.error(f"Error processing element in PDF: {str(e)}")
                 continue
-            finally:
-                # Clean up paragraph processing resources
-                gc.collect()
+
+            story.append(Spacer(1, 6))
+
+        # Add page numbers
+        def add_page_number(canvas, doc):
+            canvas.saveState()
+            canvas.setFont('Helvetica', 9)
+            canvas.drawRightString(
+                doc.pagesize[0] - doc.rightMargin,
+                doc.bottomMargin,
+                f"Page {doc.page}"
+            )
+            canvas.restoreState()
+
+        # Build PDF
+        doc.build(
+            story,
+            onFirstPage=add_page_number,
+            onLaterPages=add_page_number
+        )
         
-        doc.build(story)
         buffer.seek(0)
         return buffer.getvalue()
+        
     except Exception as e:
         logging.error(f"Error converting summary to PDF: {str(e)}")
         raise
     finally:
-        # Clean up resources
+        # Cleanup
+        if 'session' in locals():
+            session.close()
         cleanup_resources()
-        del story
         gc.collect()
 
 def enrich_summary_with_visuals(summary: dict) -> dict:
@@ -480,26 +636,26 @@ def enrich_summary_with_visuals(summary: dict) -> dict:
         if not content:
             return summary
 
-        # Extract keywords with memory limit
-        keywords = extract_keywords(content[:50000])  # Limit text analysis
+        # Extract keywords from the first part of content
+        keywords = extract_keywords(content[:50000])
         if not keywords:
             return summary
 
-        # Generate word cloud
+        # Generate word cloud first
         wordcloud = None
         try:
-            wordcloud = generate_wordcloud(content[:20000])  # Limit text for wordcloud
+            wordcloud = generate_wordcloud(content[:20000])
         except Exception as e:
             logging.error(f"Error generating wordcloud: {str(e)}")
 
-        # Fetch images
+        # Fetch and validate images
         images = []
         try:
-            images = fetch_images_from_multiple_sources(keywords[:3])  # Limit keywords
+            images = fetch_images_from_multiple_sources(keywords[:3])
         except Exception as e:
             logging.error(f"Error fetching images: {str(e)}")
 
-        # Insert visuals
+        # Insert visuals into content
         try:
             enriched_content = insert_visuals_into_summary(content, images, wordcloud)
         except Exception as e:

@@ -106,18 +106,28 @@ class SummarizationModel:
             self.model_cache = ModelCache()
             self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-            self.tokenizer = AutoTokenizer.from_pretrained(model_name, token=HUGGINGFACE_API_KEY)
-            self.model = AutoModelForSeq2SeqLM.from_pretrained(model_name, token=HUGGINGFACE_API_KEY)
-            self.model.to(self.device)
+            # Add error handling for model loading
+            try:
+                self.tokenizer = AutoTokenizer.from_pretrained(model_name, token=HUGGINGFACE_API_KEY)
+                self.model = AutoModelForSeq2SeqLM.from_pretrained(model_name, token=HUGGINGFACE_API_KEY)
+                self.model.to(self.device)
+            except Exception as e:
+                logging.error(f"Error loading model: {str(e)}")
+                raise RuntimeError(f"Failed to load model {model_name}: {str(e)}")
 
-            self.summarizer = pipeline(
-                "summarization",
-                model=self.model,
-                tokenizer=self.tokenizer,
-                device=0 if torch.cuda.is_available() else -1,
-                framework="pt",
-                torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32
-            )
+            # Add try-except for pipeline creation
+            try:
+                self.summarizer = pipeline(
+                    "summarization",
+                    model=self.model,
+                    tokenizer=self.tokenizer,
+                    device=0 if torch.cuda.is_available() else -1,
+                    framework="pt",
+                    torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32
+                )
+            except Exception as e:
+                logging.error(f"Error creating pipeline: {str(e)}")
+                raise RuntimeError(f"Failed to create summarization pipeline: {str(e)}")
 
             self.max_chunk_size = 1024
             self.min_chunk_size = 10
@@ -127,10 +137,15 @@ class SummarizationModel:
             self.lock = Lock()
             self.executor = ThreadPoolExecutor(max_workers=3)
 
-            nltk.download('punkt', quiet=True)
-            nltk.download('averaged_perceptron_tagger', quiet=True)
-            nltk.download('stopwords', quiet=True)
-            
+            # Add error handling for NLTK downloads
+            try:
+                nltk.download('punkt', quiet=True)
+                nltk.download('averaged_perceptron_tagger', quiet=True)
+                nltk.download('stopwords', quiet=True)
+            except Exception as e:
+                logging.warning(f"Error downloading NLTK data: {str(e)}")
+                # Continue anyway as the downloads might already exist
+
             logging.info(f"Summarization model initialized successfully on {self.device}")
         except Exception as e:
             logging.error(f"Error initializing SummarizationModel: {str(e)}")
@@ -139,6 +154,9 @@ class SummarizationModel:
     def clean_text(self, text: str) -> str:
         """Enhanced text cleaning with advanced filtering."""
         if not isinstance(text, str):
+            return ""
+        # Add input validation
+        if not text.strip():
             return ""
         text = re.sub(r'[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\xFF]', '', text)
         text = re.sub(r'\s+', ' ', text)
@@ -150,6 +168,8 @@ class SummarizationModel:
     def preprocess_text(self, text: str) -> str:
         """Comprehensive text preprocessing pipeline."""
         try:
+            if not text:
+                return ""
             text = self.clean_text(text)
             text = re.sub(r'\n+', '\n', text)
             text = re.sub(r'([.!?])\n', r'\1 ', text)
@@ -160,46 +180,78 @@ class SummarizationModel:
             return text
         except Exception as e:
             logging.error(f"Error in preprocess_text: {str(e)}")
-            return text
+            return text if isinstance(text, str) else ""
 
     def optimize_length_params(self, text: str, summary_depth: float = 0.3) -> tuple[int, int]:
         """Dynamically optimize summary length parameters based on input characteristics."""
-        input_length = len(text.split())
-        max_length = int(input_length * min(summary_depth, self.max_length_ratio))
-        min_length = int(input_length * max(summary_depth * 0.3, self.min_length_ratio))
-        max_length = min(max(max_length, 20), 1024)
-        min_length = min(max(min_length, 5), max_length - 5)
-        return max_length, min_length
+        try:
+            input_length = len(text.split())
+            max_length = int(input_length * min(summary_depth, self.max_length_ratio))
+            min_length = int(input_length * max(summary_depth * 0.3, self.min_length_ratio))
+            max_length = min(max(max_length, 20), 1024)
+            min_length = min(max(min_length, 5), max_length - 5)
+            return max_length, min_length
+        except Exception as e:
+            logging.error(f"Error in optimize_length_params: {str(e)}")
+            return 100, 30  # Default fallback values
 
     def generate_summary(self, text: str, summary_depth: float = 0.3, timeout: int = 30) -> Optional[str]:
         """Generate a summary with enhanced error handling and timeout protection."""
         try:
             start_time = time.time()
             with self.lock:
+                # Add input validation
+                if not text or not isinstance(text, str):
+                    return "Invalid input text"
+                
                 cleaned_text = self.preprocess_text(text)
                 if not cleaned_text:
                     return "Input text is empty after preprocessing."
+                    
                 word_count = len(cleaned_text.split())
                 if word_count < self.min_chunk_size:
                     return cleaned_text
-                max_length, min_length = self.optimize_length_params(cleaned_text, summary_depth)
-                summary = self.summarizer(
-                    cleaned_text,
-                    max_length=max_length,
-                    min_length=min_length,
-                    do_sample=True,
-                    num_beams=2,
-                    temperature=0.7,
-                    top_k=50,
-                    top_p=0.95,
-                    early_stopping=True,
-                    no_repeat_ngram_size=3,
-                    batch_size=self.batch_size
-                )
+
+                # Add try-except for parameter optimization
+                try:
+                    max_length, min_length = self.optimize_length_params(cleaned_text, summary_depth)
+                except Exception as e:
+                    logging.error(f"Error optimizing length parameters: {str(e)}")
+                    max_length, min_length = 100, 30  # Default fallback values
+
+                # Add timeout check before summary generation
                 if time.time() - start_time > timeout:
-                    return cleaned_text[:max_length]
-                result = summary[0]['summary_text'].strip()
-                return re.sub(r'\s+', ' ', result).replace(' .', '.').replace(' ,', ',')
+                    return cleaned_text[:1024]  # Return truncated text if timeout occurred
+
+                try:
+                    summary = self.summarizer(
+                        cleaned_text,
+                        max_length=max_length,
+                        min_length=min_length,
+                        do_sample=True,
+                        num_beams=2,
+                        temperature=0.7,
+                        top_k=50,
+                        top_p=0.95,
+                        early_stopping=True,
+                        no_repeat_ngram_size=3,
+                        batch_size=self.batch_size
+                    )
+                    
+                    # Validate summary output
+                    if not summary or not isinstance(summary, list) or len(summary) == 0:
+                        return "Error: Empty summary generated"
+                    
+                    result = summary[0].get('summary_text', '').strip()
+                    if not result:
+                        return "Error: Empty summary text"
+                        
+                    return re.sub(r'\s+', ' ', result).replace(' .', '.').replace(' ,', ',')
+                    
+                except Exception as e:
+                    logging.error(f"Error in summarizer pipeline: {str(e)}")
+                    return f"Error generating summary: {str(e)}"
+                    
         except Exception as e:
             logging.error(f"Error in generate_summary: {str(e)}")
             return f"Error generating summary: {str(e)}"
@@ -207,19 +259,38 @@ class SummarizationModel:
     def chunk_text(self, text: str) -> List[str]:
         """Improved text chunking with sentence boundary preservation."""
         try:
-            sentences = nltk.sent_tokenize(text)
+            if not text:
+                return []
+                
+            # Add error handling for sentence tokenization
+            try:
+                sentences = nltk.sent_tokenize(text)
+            except Exception as e:
+                logging.error(f"Error in sentence tokenization: {str(e)}")
+                # Fallback to simple splitting
+                sentences = [s.strip() + '.' for s in text.split('.') if s.strip()]
+
             chunks, current_chunk, current_length = [], [], 0
+            
             for sentence in sentences:
-                sentence_length = len(self.tokenizer.encode(sentence))
+                try:
+                    sentence_length = len(self.tokenizer.encode(sentence))
+                except Exception as e:
+                    logging.error(f"Error encoding sentence: {str(e)}")
+                    sentence_length = len(sentence.split())  # Fallback to word count
+                    
                 if current_length + sentence_length > self.max_chunk_size:
                     if current_chunk:
                         chunks.append(' '.join(current_chunk))
                         current_chunk, current_length = [], 0
                 current_chunk.append(sentence)
                 current_length += sentence_length
+                
             if current_chunk:
                 chunks.append(' '.join(current_chunk))
-            return chunks
+                
+            return chunks if chunks else [text]
+            
         except Exception as e:
             logging.error(f"Error in chunk_text: {str(e)}")
             return [text]
@@ -228,51 +299,90 @@ class SummarizationModel:
         """Handle long documents with improved chunking and multi-stage summarization."""
         try:
             start_time = time.time()
+            
+            # Add input validation
+            if not text or not isinstance(text, str):
+                return "Invalid input document"
+                
             cleaned_text = self.preprocess_text(text)
             if not cleaned_text:
                 return "Empty or invalid document"
+                
+            # Check if document needs chunking
             if len(cleaned_text.split()) <= self.max_chunk_size:
                 return self.generate_summary(cleaned_text, summary_depth)
+                
             chunks = self.chunk_text(cleaned_text)
             if not chunks:
                 return "Unable to process document"
+                
             chunk_summaries = []
             with ThreadPoolExecutor() as executor:
-                futures = [executor.submit(self.generate_summary, chunk, summary_depth) for chunk in chunks]
-                for future in as_completed(futures):
+                futures = []
+                
+                # Submit chunks for processing
+                for chunk in chunks:
                     if time.time() - start_time > max_time:
                         break
-                    summary = future.result(timeout=30)
-                    if summary and not summary.startswith("Error"):
-                        chunk_summaries.append(summary)
+                    futures.append(executor.submit(self.generate_summary, chunk, summary_depth))
+                
+                # Collect results with timeout handling
+                for future in as_completed(futures):
+                    try:
+                        if time.time() - start_time > max_time:
+                            break
+                        summary = future.result(timeout=30)
+                        if summary and not summary.startswith("Error"):
+                            chunk_summaries.append(summary)
+                    except Exception as e:
+                        logging.error(f"Error processing chunk: {str(e)}")
+                        continue
+                        
+            # Process collected summaries
             if len(chunk_summaries) > 1:
-                return self.generate_summary(" ".join(chunk_summaries), summary_depth)
+                try:
+                    return self.generate_summary(" ".join(chunk_summaries), summary_depth)
+                except Exception as e:
+                    logging.error(f"Error in final summary generation: {str(e)}")
+                    return " ".join(chunk_summaries)  # Fallback to concatenated summaries
             elif chunk_summaries:
                 return chunk_summaries[0]
             else:
                 return "Unable to generate summary"
+                
         except Exception as e:
             logging.error(f"Error in summarize_long_document: {str(e)}")
             return f"Error summarizing document: {str(e)}"
 
     def __call__(self, text: str, summary_depth: float = 0.3) -> str:
         """Enhanced call method with automatic handling of document length."""
-        word_count = len(text.split())
-        if word_count > self.max_chunk_size:
-            return self.summarize_long_document(text, summary_depth)
-        return self.generate_summary(text, summary_depth)
+        try:
+            if not text or not isinstance(text, str):
+                return "Invalid input text"
+                
+            word_count = len(text.split())
+            if word_count > self.max_chunk_size:
+                return self.summarize_long_document(text, summary_depth)
+            return self.generate_summary(text, summary_depth)
+        except Exception as e:
+            logging.error(f"Error in __call__: {str(e)}")
+            return f"Error processing text: {str(e)}"
 
-# Singleton instance creation
+# Singleton instance creation with improved error handling
 _model_lock = Lock()
 _summarization_model = None
 
 def get_model():
-    """Get or create singleton instance of SummarizationModel."""
+    """Get or create singleton instance of SummarizationModel with error handling."""
     global _summarization_model
-    with _model_lock:
-        if _summarization_model is None:
-            _summarization_model = SummarizationModel()
-        return _summarization_model
+    try:
+        with _model_lock:
+            if _summarization_model is None:
+                _summarization_model = SummarizationModel()
+            return _summarization_model
+    except Exception as e:
+        logging.error(f"Error creating model instance: {str(e)}")
+        raise RuntimeError(f"Failed to initialize summarization model: {str(e)}")
 
 if __name__ == "__main__":
     # Test the model with sample texts of varying lengths
@@ -318,19 +428,27 @@ if __name__ == "__main__":
                 # Monitor memory during summary generation
                 with memory_manager.monitor_memory(f"Test {i} Summary"):
                     summary = model(text)
-                    print("Generated summary:")
-                    print(summary)
+                    if summary and not summary.startswith("Error"):
+                        print("Generated summary:")
+                        print(summary)
+                    else:
+                        print("Failed to generate summary:", summary)
                     
                 # Clean up after each test
                 memory_manager.cleanup()
                 
             except Exception as e:
                 print(f"Error during summarization test {i}: {str(e)}")
+                logging.error(f"Test {i} failed: {str(e)}")
                 continue
             
     except Exception as e:
         print(f"Error during testing: {str(e)}")
+        logging.error(f"Testing failed: {str(e)}")
     finally:
         # Final cleanup
         if 'model' in locals():
-            model.memory_manager.cleanup()
+            try:
+                model.memory_manager.cleanup()
+            except Exception as e:
+                logging.error(f"Error during final cleanup: {str(e)}")
