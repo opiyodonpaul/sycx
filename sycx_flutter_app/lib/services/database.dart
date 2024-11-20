@@ -80,7 +80,27 @@ class Database {
 
   // Summary operations
   Future<void> createSummary(Summary summary) async {
-    await _firestore.collection('summaries').add(summary.toFirestore());
+    try {
+      await FirebaseFirestore.instance
+          .collection('summaries')
+          .doc(summary.id)
+          .set(summary.toFirestore());
+    } catch (e) {
+      print('Error creating summary in Firestore: $e');
+      rethrow;
+    }
+  }
+
+  Future<void> deleteSummary(String summaryId) async {
+    try {
+      await FirebaseFirestore.instance
+          .collection('summaries')
+          .doc(summaryId)
+          .delete();
+    } catch (e) {
+      print('Error deleting summary from Firestore: $e');
+      rethrow;
+    }
   }
 
   Future<List<Summary>> getUserSummaries(String userId) async {

@@ -28,11 +28,11 @@ logging.basicConfig(
     format='%(asctime)s - %(levelname)s - [%(filename)s:%(lineno)d] - %(message)s',
     handlers=[
         RotatingFileHandler(
-            'logs/summary.log',  # Changed path to logs directory
-            maxBytes=1024*1024,
+            'logs/summary.log',
+            maxBytes=1024 * 1024,
             backupCount=3
         ),
-        logging.StreamHandler()  # Added console output
+        logging.StreamHandler()
     ]
 )
 
@@ -63,9 +63,9 @@ class MemoryManager:
             diff_mem = end_mem - start_mem
             logging.info(
                 f"Memory usage for {operation_name}: "
-                f"Start: {start_mem/1024/1024:.2f}MB, "
-                f"End: {end_mem/1024/1024:.2f}MB, "
-                f"Diff: {diff_mem/1024/1024:.2f}MB"
+                f"Start: {start_mem / 1024 / 1024:.2f}MB, "
+                f"End: {end_mem / 1024 / 1024:.2f}MB, "
+                f"Diff: {diff_mem / 1024 / 1024:.2f}MB"
             )
     
     def cleanup(self):
@@ -73,7 +73,7 @@ class MemoryManager:
         gc.collect()
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
-            
+
 class ModelCache:
     """Manages model caching and cleanup."""
     
@@ -104,169 +104,132 @@ class SummarizationModel:
             self.model_name = model_name
             self.memory_manager = MemoryManager()
             self.model_cache = ModelCache()
-            
-            # Set device with memory optimization
-            if torch.cuda.is_available():
-                # Get GPU memory info
-                gpu_memory = torch.cuda.get_device_properties(0).total_memory
-                if gpu_memory < 4 * 1024 * 1024 * 1024:  # Less than 4GB
-                    self.device = torch.device("cpu")
-                    logging.info("Using CPU due to limited GPU memory")
-                else:
-                    self.device = torch.device("cuda")
-            else:
-                self.device = torch.device("cpu")
-            
-            # Optimize chunk sizes based on available memory
-            self.max_chunk_size = min(1024, MAX_MEMORY_MB // 2)
+            self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+            # Add error handling for model loading
+            try:
+                self.tokenizer = AutoTokenizer.from_pretrained(model_name, token=HUGGINGFACE_API_KEY)
+                self.model = AutoModelForSeq2SeqLM.from_pretrained(model_name, token=HUGGINGFACE_API_KEY)
+                self.model.to(self.device)
+            except Exception as e:
+                logging.error(f"Error loading model: {str(e)}")
+                raise RuntimeError(f"Failed to load model {model_name}: {str(e)}")
+
+            # Add try-except for pipeline creation
+            try:
+                self.summarizer = pipeline(
+                    "summarization",
+                    model=self.model,
+                    tokenizer=self.tokenizer,
+                    device=0 if torch.cuda.is_available() else -1,
+                    framework="pt",
+                    torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32
+                )
+            except Exception as e:
+                logging.error(f"Error creating pipeline: {str(e)}")
+                raise RuntimeError(f"Failed to create summarization pipeline: {str(e)}")
+
+            self.max_chunk_size = 1024
             self.min_chunk_size = 10
-            self.batch_size = 2 if torch.cuda.is_available() else 1
-            
-            # Initialize NLTK data with error handling and cleanup
-            with self.memory_manager.monitor_memory("NLTK Download"):
-                for resource in ['punkt', 'averaged_perceptron_tagger', 'stopwords']:
-                    try:
-                        nltk.download(resource, quiet=True)
-                    except Exception as e:
-                        logging.warning(f"Failed to download NLTK resource {resource}: {e}")
-            
+            self.batch_size = 4 if torch.cuda.is_available() else 1
+            self.max_length_ratio = 0.4
+            self.min_length_ratio = 0.1
             self.lock = Lock()
-            self.executor = ThreadPoolExecutor(max_workers=2)  # Reduced workers
-            
-            logging.info(f"Summarization model initialized on {self.device}")
-            
+            self.executor = ThreadPoolExecutor(max_workers=3)
+
+            # Add error handling for NLTK downloads
+            try:
+                nltk.download('punkt', quiet=True)
+                nltk.download('averaged_perceptron_tagger', quiet=True)
+                nltk.download('stopwords', quiet=True)
+            except Exception as e:
+                logging.warning(f"Error downloading NLTK data: {str(e)}")
+                # Continue anyway as the downloads might already exist
+
+            logging.info(f"Summarization model initialized successfully on {self.device}")
         except Exception as e:
             logging.error(f"Error initializing SummarizationModel: {str(e)}")
             raise
 
-    def _load_model(self):
-        """Lazy load model with memory optimization."""
-        if self.model_cache.model is None:
-            with self.memory_manager.monitor_memory("Model Loading"):
-                # Set Hugging Face token
-                if HUGGINGFACE_API_KEY:
-                    os.environ["TRANSFORMERS_TOKEN"] = HUGGINGFACE_API_KEY
-                
-                # Load with optimized settings
-                self.model_cache.tokenizer = AutoTokenizer.from_pretrained(
-                    self.model_name,
-                    token=HUGGINGFACE_API_KEY,
-                    model_max_length=self.max_chunk_size
-                )
-                
-                self.model_cache.model = AutoModelForSeq2SeqLM.from_pretrained(
-                    self.model_name,
-                    token=HUGGINGFACE_API_KEY,
-                    torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32,
-                    low_cpu_mem_usage=True
-                ).to(self.device)
-                
-                # Create pipeline with memory optimizations
-                self.summarizer = pipeline(
-                    "summarization",
-                    model=self.model_cache.model,
-                    tokenizer=self.model_cache.tokenizer,
-                    device=0 if torch.cuda.is_available() else -1,
-                    framework="pt",
-                    torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32,
-                    batch_size=self.batch_size
-                )
-                
-                self.model_cache.last_used = time.time()
-
     def clean_text(self, text: str) -> str:
-        """Memory-efficient text cleaning."""
+        """Enhanced text cleaning with advanced filtering."""
         if not isinstance(text, str):
             return ""
-        
-        with self.memory_manager.monitor_memory("Text Cleaning"):
-            # Remove special characters and normalize whitespace
-            text = re.sub(r'[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\xFF]', '', text)
-            text = re.sub(r'\s+', ' ', text)
-            
-            # Remove very long strings that are likely garbage
-            text = ' '.join(word for word in text.split() if len(word) < 45)
-            
-            # Remove repeated punctuation
-            text = re.sub(r'([!?,.])\1+', r'\1', text)
-            
-            # Remove extra whitespace
-            text = text.strip()
-            
-            return text
+        # Add input validation
+        if not text.strip():
+            return ""
+        text = re.sub(r'[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\xFF]', '', text)
+        text = re.sub(r'\s+', ' ', text)
+        text = ' '.join(word for word in text.split() if len(word) < 45)
+        text = re.sub(r'([!?,.])\1+', r'\1', text)
+        text = text.strip()
+        return text
 
     def preprocess_text(self, text: str) -> str:
-        """Memory-efficient text preprocessing."""
+        """Comprehensive text preprocessing pipeline."""
         try:
-            with self.memory_manager.monitor_memory("Text Preprocessing"):
-                # Basic cleaning
-                text = self.clean_text(text)
-                
-                # Remove unnecessary line breaks while preserving paragraph structure
-                text = re.sub(r'\n+', '\n', text)
-                text = re.sub(r'([.!?])\n', r'\1 ', text)
-                
-                # Handle common PDF artifacts
-                text = re.sub(r'(\w)-\n(\w)', r'\1\2', text)
-                text = re.sub(r'(?<=[.!?])\s*(?=[A-Z])', ' ', text)
-                
-                # Remove redundant information
-                text = re.sub(r'Page \d+( of \d+)?', '', text)
-                text = re.sub(r'^\s*Table of Contents\s*$', '', text, flags=re.MULTILINE)
-                
-                return text
-                
+            if not text:
+                return ""
+            text = self.clean_text(text)
+            text = re.sub(r'\n+', '\n', text)
+            text = re.sub(r'([.!?])\n', r'\1 ', text)
+            text = re.sub(r'(\w)-\n(\w)', r'\1\2', text)
+            text = re.sub(r'(?<=[.!?])\s*(?=[A-Z])', ' ', text)
+            text = re.sub(r'Page \d+( of \d+)?', '', text)
+            text = re.sub(r'^\s*Table of Contents\s*$', '', text, flags=re.MULTILINE)
+            return text
         except Exception as e:
             logging.error(f"Error in preprocess_text: {str(e)}")
-            return text
+            return text if isinstance(text, str) else ""
 
     def optimize_length_params(self, text: str, summary_depth: float = 0.3) -> tuple[int, int]:
-        """Memory-aware parameter optimization."""
-        with self.memory_manager.monitor_memory("Length Parameter Optimization"):
+        """Dynamically optimize summary length parameters based on input characteristics."""
+        try:
             input_length = len(text.split())
-            
-            # Calculate base lengths using summary_depth
-            max_length = min(
-                int(input_length * min(summary_depth, 0.4)),
-                self.max_chunk_size
-            )
-            min_length = int(max_length * 0.3)
-            
-            # Apply constraints
-            max_length = min(max(max_length, 20), self.max_chunk_size)
+            max_length = int(input_length * min(summary_depth, self.max_length_ratio))
+            min_length = int(input_length * max(summary_depth * 0.3, self.min_length_ratio))
+            max_length = min(max(max_length, 20), 1024)
             min_length = min(max(min_length, 5), max_length - 5)
-            
             return max_length, min_length
+        except Exception as e:
+            logging.error(f"Error in optimize_length_params: {str(e)}")
+            return 100, 30  # Default fallback values
 
     def generate_summary(self, text: str, summary_depth: float = 0.3, timeout: int = 30) -> Optional[str]:
-        """Generate summary with memory management and optimization."""
+        """Generate a summary with enhanced error handling and timeout protection."""
         try:
             start_time = time.time()
-            
             with self.lock:
-                with self.memory_manager.monitor_memory("Summary Generation"):
-                    # Load model if needed
-                    self._load_model()
+                # Add input validation
+                if not text or not isinstance(text, str):
+                    return "Invalid input text"
+                
+                cleaned_text = self.preprocess_text(text)
+                if not cleaned_text:
+                    return "Input text is empty after preprocessing."
                     
-                    # Input validation and preprocessing
-                    cleaned_text = self.preprocess_text(text)
-                    if not cleaned_text:
-                        return "Input text is empty after preprocessing."
-                    
-                    word_count = len(cleaned_text.split())
-                    if word_count < self.min_chunk_size:
-                        return cleaned_text
-                    
-                    # Get optimized length parameters
+                word_count = len(cleaned_text.split())
+                if word_count < self.min_chunk_size:
+                    return cleaned_text
+
+                # Add try-except for parameter optimization
+                try:
                     max_length, min_length = self.optimize_length_params(cleaned_text, summary_depth)
-                    
-                    # Generate summary with optimized parameters
+                except Exception as e:
+                    logging.error(f"Error optimizing length parameters: {str(e)}")
+                    max_length, min_length = 100, 30  # Default fallback values
+
+                # Add timeout check before summary generation
+                if time.time() - start_time > timeout:
+                    return cleaned_text[:1024]  # Return truncated text if timeout occurred
+
+                try:
                     summary = self.summarizer(
                         cleaned_text,
                         max_length=max_length,
                         min_length=min_length,
                         do_sample=True,
-                        num_beams=2,  # Reduced for memory optimization
+                        num_beams=2,
                         temperature=0.7,
                         top_k=50,
                         top_p=0.95,
@@ -275,137 +238,151 @@ class SummarizationModel:
                         batch_size=self.batch_size
                     )
                     
-                    # Check timeout
-                    if time.time() - start_time > timeout:
-                        return cleaned_text[:max_length]
+                    # Validate summary output
+                    if not summary or not isinstance(summary, list) or len(summary) == 0:
+                        return "Error: Empty summary generated"
                     
-                    result = summary[0]['summary_text'].strip()
+                    result = summary[0].get('summary_text', '').strip()
+                    if not result:
+                        return "Error: Empty summary text"
+                        
+                    return re.sub(r'\s+', ' ', result).replace(' .', '.').replace(' ,', ',')
                     
-                    # Clean up memory
-                    self.memory_manager.cleanup()
+                except Exception as e:
+                    logging.error(f"Error in summarizer pipeline: {str(e)}")
+                    return f"Error generating summary: {str(e)}"
                     
-                    return result if result else cleaned_text[:max_length]
-
         except Exception as e:
             logging.error(f"Error in generate_summary: {str(e)}")
             return f"Error generating summary: {str(e)}"
 
     def chunk_text(self, text: str) -> List[str]:
-        """Memory-efficient text chunking."""
+        """Improved text chunking with sentence boundary preservation."""
         try:
-            with self.memory_manager.monitor_memory("Text Chunking"):
+            if not text:
+                return []
+                
+            # Add error handling for sentence tokenization
+            try:
                 sentences = nltk.sent_tokenize(text)
-                chunks = []
-                current_chunk = []
-                current_length = 0
-                
-                for sentence in sentences:
-                    sentence_length = len(self.model_cache.tokenizer.encode(sentence))
+            except Exception as e:
+                logging.error(f"Error in sentence tokenization: {str(e)}")
+                # Fallback to simple splitting
+                sentences = [s.strip() + '.' for s in text.split('.') if s.strip()]
+
+            chunks, current_chunk, current_length = [], [], 0
+            
+            for sentence in sentences:
+                try:
+                    sentence_length = len(self.tokenizer.encode(sentence))
+                except Exception as e:
+                    logging.error(f"Error encoding sentence: {str(e)}")
+                    sentence_length = len(sentence.split())  # Fallback to word count
                     
-                    if current_length + sentence_length > self.max_chunk_size:
-                        if current_chunk:
-                            chunks.append(' '.join(current_chunk))
-                            current_chunk = []
-                            current_length = 0
-                    
-                    current_chunk.append(sentence)
-                    current_length += sentence_length
+                if current_length + sentence_length > self.max_chunk_size:
+                    if current_chunk:
+                        chunks.append(' '.join(current_chunk))
+                        current_chunk, current_length = [], 0
+                current_chunk.append(sentence)
+                current_length += sentence_length
                 
-                if current_chunk:
-                    chunks.append(' '.join(current_chunk))
+            if current_chunk:
+                chunks.append(' '.join(current_chunk))
                 
-                return chunks
-                
+            return chunks if chunks else [text]
+            
         except Exception as e:
             logging.error(f"Error in chunk_text: {str(e)}")
             return [text]
 
     def summarize_long_document(self, text: str, summary_depth: float = 0.3, max_time: int = 300) -> str:
-        """Handle long documents with memory optimization."""
+        """Handle long documents with improved chunking and multi-stage summarization."""
         try:
             start_time = time.time()
             
-            with self.memory_manager.monitor_memory("Long Document Summarization"):
-                # Preprocess the entire document
-                cleaned_text = self.preprocess_text(text)
-                if not cleaned_text:
-                    return "Empty or invalid document"
-
-                # For shorter texts, summarize directly
-                if len(cleaned_text.split()) <= self.max_chunk_size:
-                    return self.generate_summary(cleaned_text, summary_depth)
-
-                # For long texts, use multi-stage summarization
-                chunks = self.chunk_text(cleaned_text)
-                if not chunks:
-                    return "Unable to process document"
-
-                # First stage: Summarize each chunk
-                chunk_summaries = []
+            # Add input validation
+            if not text or not isinstance(text, str):
+                return "Invalid input document"
+                
+            cleaned_text = self.preprocess_text(text)
+            if not cleaned_text:
+                return "Empty or invalid document"
+                
+            # Check if document needs chunking
+            if len(cleaned_text.split()) <= self.max_chunk_size:
+                return self.generate_summary(cleaned_text, summary_depth)
+                
+            chunks = self.chunk_text(cleaned_text)
+            if not chunks:
+                return "Unable to process document"
+                
+            chunk_summaries = []
+            with ThreadPoolExecutor() as executor:
                 futures = []
                 
-                with ThreadPoolExecutor(max_workers=2) as executor:
-                    for chunk in chunks:
+                # Submit chunks for processing
+                for chunk in chunks:
+                    if time.time() - start_time > max_time:
+                        break
+                    futures.append(executor.submit(self.generate_summary, chunk, summary_depth))
+                
+                # Collect results with timeout handling
+                for future in as_completed(futures):
+                    try:
                         if time.time() - start_time > max_time:
                             break
+                        summary = future.result(timeout=30)
+                        if summary and not summary.startswith("Error"):
+                            chunk_summaries.append(summary)
+                    except Exception as e:
+                        logging.error(f"Error processing chunk: {str(e)}")
+                        continue
                         
-                        future = executor.submit(self.generate_summary, chunk, summary_depth)
-                        futures.append(future)
-                    
-                    # Collect results
-                    for future in as_completed(futures):
-                        if time.time() - start_time > max_time:
-                            break
-                        try:
-                            summary = future.result(timeout=30)
-                            if summary and not summary.startswith("Error"):
-                                chunk_summaries.append(summary)
-                        except Exception as e:
-                            logging.error(f"Error processing chunk: {str(e)}")
-
-                # Clean up between stages
-                self.memory_manager.cleanup()
-
-                # Second stage: Combine and summarize again if needed
-                if len(chunk_summaries) > 1:
-                    combined_text = " ".join(chunk_summaries)
-                    return self.generate_summary(combined_text, summary_depth)
-                elif chunk_summaries:
-                    return chunk_summaries[0]
-                else:
-                    return "Unable to generate summary"
-
+            # Process collected summaries
+            if len(chunk_summaries) > 1:
+                try:
+                    return self.generate_summary(" ".join(chunk_summaries), summary_depth)
+                except Exception as e:
+                    logging.error(f"Error in final summary generation: {str(e)}")
+                    return " ".join(chunk_summaries)  # Fallback to concatenated summaries
+            elif chunk_summaries:
+                return chunk_summaries[0]
+            else:
+                return "Unable to generate summary"
+                
         except Exception as e:
             logging.error(f"Error in summarize_long_document: {str(e)}")
             return f"Error summarizing document: {str(e)}"
 
     def __call__(self, text: str, summary_depth: float = 0.3) -> str:
-        """Memory-optimized call method."""
+        """Enhanced call method with automatic handling of document length."""
         try:
-            with self.memory_manager.monitor_memory("Model Call"):
-                word_count = len(text.split())
-                if word_count > self.max_chunk_size:
-                    return self.summarize_long_document(text, summary_depth)
-                return self.generate_summary(text, summary_depth)
-        finally:
-            # Cleanup stale model cache
-            self.model_cache.cleanup_if_stale()
+            if not text or not isinstance(text, str):
+                return "Invalid input text"
+                
+            word_count = len(text.split())
+            if word_count > self.max_chunk_size:
+                return self.summarize_long_document(text, summary_depth)
+            return self.generate_summary(text, summary_depth)
+        except Exception as e:
+            logging.error(f"Error in __call__: {str(e)}")
+            return f"Error processing text: {str(e)}"
 
-# Singleton instance with memory-aware lazy loading
+# Singleton instance creation with improved error handling
 _model_lock = Lock()
 _summarization_model = None
 
 def get_model():
-    """Get or create singleton instance of SummarizationModel with memory optimization."""
+    """Get or create singleton instance of SummarizationModel with error handling."""
     global _summarization_model
-    with _model_lock:
-        if _summarization_model is None:
-            try:
+    try:
+        with _model_lock:
+            if _summarization_model is None:
                 _summarization_model = SummarizationModel()
-            except Exception as e:
-                logging.error(f"Error creating summarization model: {str(e)}")
-                raise
-        return _summarization_model
+            return _summarization_model
+    except Exception as e:
+        logging.error(f"Error creating model instance: {str(e)}")
+        raise RuntimeError(f"Failed to initialize summarization model: {str(e)}")
 
 if __name__ == "__main__":
     # Test the model with sample texts of varying lengths
@@ -420,33 +397,24 @@ if __name__ == "__main__":
             animals including humans. AI research has been defined as the field of study of intelligent agents, which refers to any 
             system that perceives its environment and takes actions that maximize its chance of achieving its goals.
             """,
-            # Add a long text here for testing, e.g., a few paragraphs or more
-            "This is a very long text.",
+            # Add a more substantial long text for testing
             """
-            Artificial intelligence (AI) is intelligence demonstrated by machines, as opposed to natural intelligence displayed by 
-            animals including humans. AI research has been defined as the field of study of intelligent agents, which refers to any 
-            system that perceives its environment and takes actions that maximize its chance of achieving its goals.
-            Artificial intelligence (AI) is intelligence demonstrated by machines, as opposed to natural intelligence displayed by 
-            animals including humans. AI research has been defined as the field of study of intelligent agents, which refers to any 
-            system that perceives its environment and takes actions that maximize its chance of achieving its goals.
-            Artificial intelligence (AI) is intelligence demonstrated by machines, as opposed to natural intelligence displayed by 
-            animals including humans. AI research has been defined as the field of study of intelligent agents, which refers to any 
-            system that perceives its environment and takes actions that maximize its chance of achieving its goals.
-            Artificial intelligence (AI) is intelligence demonstrated by machines, as opposed to natural intelligence displayed by 
-            animals including humans. AI research has been defined as the field of study of intelligent agents, which refers to any 
-            system that perceives its environment and takes actions that maximize its chance of achieving its goals.
-            Artificial intelligence (AI) is intelligence demonstrated by machines, as opposed to natural intelligence displayed by 
-            animals including humans. AI research has been defined as the field of study of intelligent agents, which refers to any 
-            system that perceives its environment and takes actions that maximize its chance of achieving its goals.
-            Artificial intelligence (AI) is intelligence demonstrated by machines, as opposed to natural intelligence displayed by 
-            animals including humans. AI research has been defined as the field of study of intelligent agents, which refers to any 
-            system that perceives its environment and takes actions that maximize its chance of achieving its goals.
-            Artificial intelligence (AI) is intelligence demonstrated by machines, as opposed to natural intelligence displayed by 
-            animals including humans. AI research has been defined as the field of study of intelligent agents, which refers to any 
-            system that perceives its environment and takes actions that maximize its chance of achieving its goals.
-            Artificial intelligence (AI) is intelligence demonstrated by machines, as opposed to natural intelligence displayed by 
-            animals including humans. AI research has been defined as the field of study of intelligent agents, which refers to any 
-            system that perceives its environment and takes actions that maximize its chance of achieving its goals.
+            Artificial intelligence (AI) is a rapidly evolving field of computer science that aims to create intelligent machines 
+            that can perform tasks that typically require human intelligence. These tasks include learning, problem-solving, 
+            perception, language understanding, and decision-making. AI has numerous applications across various domains, 
+            from healthcare and finance to transportation and entertainment.
+
+            Machine learning, a subset of AI, focuses on developing algorithms that can learn from and make predictions or decisions 
+            based on data. Deep learning, a more advanced approach within machine learning, uses artificial neural networks inspired 
+            by the human brain's structure. These networks can process complex patterns and make sophisticated predictions.
+
+            In recent years, AI has made significant breakthroughs in areas like natural language processing, computer vision, 
+            and robotics. Technologies like ChatGPT demonstrate the potential of large language models to generate human-like text, 
+            while AI-powered image recognition systems can identify objects and faces with remarkable accuracy.
+
+            However, the rapid advancement of AI also raises important ethical and societal questions. Concerns about privacy, 
+            job displacement, bias in AI algorithms, and the potential long-term implications of artificial general intelligence 
+            are topics of ongoing debate among researchers, policymakers, and the public.
             """,
         ]
         
@@ -460,19 +428,27 @@ if __name__ == "__main__":
                 # Monitor memory during summary generation
                 with memory_manager.monitor_memory(f"Test {i} Summary"):
                     summary = model(text)
-                    print("Generated summary:")
-                    print(summary)
+                    if summary and not summary.startswith("Error"):
+                        print("Generated summary:")
+                        print(summary)
+                    else:
+                        print("Failed to generate summary:", summary)
                     
                 # Clean up after each test
                 memory_manager.cleanup()
                 
             except Exception as e:
                 print(f"Error during summarization test {i}: {str(e)}")
+                logging.error(f"Test {i} failed: {str(e)}")
                 continue
             
     except Exception as e:
         print(f"Error during testing: {str(e)}")
+        logging.error(f"Testing failed: {str(e)}")
     finally:
         # Final cleanup
         if 'model' in locals():
-            model.memory_manager.cleanup()
+            try:
+                model.memory_manager.cleanup()
+            except Exception as e:
+                logging.error(f"Error during final cleanup: {str(e)}")
