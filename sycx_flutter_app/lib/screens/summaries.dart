@@ -1,7 +1,11 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
 import 'package:fluttertoast/fluttertoast.dart';
-import 'package:sycx_flutter_app/dummy_data.dart';
+import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
+import 'package:sycx_flutter_app/models/user.dart' as app_user;
+import 'package:sycx_flutter_app/models/summary.dart';
+import 'package:sycx_flutter_app/services/database.dart';
 import 'package:sycx_flutter_app/screens/search_results.dart';
 import 'package:sycx_flutter_app/utils/constants.dart';
 import 'package:sycx_flutter_app/widgets/custom_app_bar.dart';
@@ -23,11 +27,15 @@ class SummariesState extends State<Summaries>
   bool _showAppBarBackground = false;
   late AnimationController _animationController;
 
-  List summaries = DummyData.summaries;
-  List<String> searches = List<String>.from(DummyData.searches);
+  List<Summary> _summaries = [];
+  List<String> _searches = [];
   bool _isLoading = true;
   final TextEditingController _searchController = TextEditingController();
   final FocusNode _searchFocusNode = FocusNode();
+
+  // User data
+  app_user.User? _currentUser;
+  final Database _database = Database();
 
   @override
   void initState() {
@@ -42,12 +50,69 @@ class SummariesState extends State<Summaries>
   }
 
   Future<void> _loadData() async {
-    await Future.delayed(const Duration(seconds: 2));
-    if (mounted) {
-      setState(() {
-        _isLoading = false;
-      });
-      _animationController.forward();
+    try {
+      // Get current user ID
+      final firebaseUser = firebase_auth.FirebaseAuth.instance.currentUser;
+      if (firebaseUser != null) {
+        // Fetch user data
+        final user = await _database.getUser(firebaseUser.uid);
+
+        // Fetch all user summaries
+        final summaries = await _database.getUserSummaries(firebaseUser.uid);
+
+        // Fetch recent searches
+        final searches = await _fetchRecentSearches(firebaseUser.uid);
+
+        if (mounted) {
+          setState(() {
+            _currentUser = user;
+            _summaries = summaries.reversed.toList();
+            _searches = searches;
+            _isLoading = false;
+          });
+          _animationController.forward();
+        }
+      }
+    } catch (e) {
+      print('Error loading data: $e');
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  Future<List<String>> _fetchRecentSearches(String userId) async {
+    try {
+      QuerySnapshot searchesSnapshot = await _database.firestore
+          .collection('searches')
+          .where('userId', isEqualTo: userId)
+          .orderBy('timestamp', descending: true)
+          .limit(5)
+          .get();
+
+      return searchesSnapshot.docs
+          .map((doc) => doc['query'] as String)
+          .toList();
+    } catch (e) {
+      print('Error fetching searches: $e');
+      return [];
+    }
+  }
+
+  Future<void> _saveSearch(String query) async {
+    try {
+      final firebaseUser = firebase_auth.FirebaseAuth.instance.currentUser;
+      if (firebaseUser != null) {
+        await _database.firestore.collection('searches').add({
+          'userId': firebaseUser.uid,
+          'query': query,
+          'timestamp': FieldValue.serverTimestamp(),
+        });
+      }
+    } catch (e) {
+      print('Error saving search: $e');
     }
   }
 
@@ -76,7 +141,7 @@ class SummariesState extends State<Summaries>
         : Scaffold(
             extendBodyBehindAppBar: true,
             appBar: CustomAppBar(
-              user: DummyData.user,
+              user: _currentUser,
               showBackground: false,
               title: 'SycX',
             ),
@@ -144,7 +209,7 @@ class SummariesState extends State<Summaries>
             ),
             const SizedBox(height: 8),
             Text(
-              'View and manage your summarized content. You have all your summaries in one place.',
+              'View and manage your summarized content. SycX helps you keep track of all your summaries in one place.',
               style: AppTextStyles.subheadingStyle,
             ),
           ],
@@ -190,9 +255,12 @@ class SummariesState extends State<Summaries>
           prefixIcon: Icons.search,
           onFieldSubmitted: (value) {
             if (value.isNotEmpty) {
+              // Save the search
+              _saveSearch(value);
+
               setState(() {
-                if (!searches.contains(value)) {
-                  searches.insert(0, value);
+                if (!_searches.contains(value)) {
+                  _searches.insert(0, value);
                 }
               });
               Navigator.push(
@@ -252,7 +320,7 @@ class SummariesState extends State<Summaries>
                 crossAxisSpacing: 16,
                 mainAxisSpacing: 16,
               ),
-              itemCount: summaries.isEmpty ? 1 : summaries.length,
+              itemCount: _summaries.isEmpty ? 1 : _summaries.length,
               itemBuilder: (context, index) {
                 return AnimationConfiguration.staggeredGrid(
                   position: index,
@@ -260,7 +328,7 @@ class SummariesState extends State<Summaries>
                   columnCount: 2,
                   child: ScaleAnimation(
                     child: FadeInAnimation(
-                      child: summaries.isEmpty
+                      child: _summaries.isEmpty
                           ? SummaryCard(
                               summary: {
                                 'id': 'empty',
@@ -273,7 +341,21 @@ class SummariesState extends State<Summaries>
                               isEmpty: true,
                             )
                           : SummaryCard(
-                              summary: summaries[index],
+                              summary: {
+                                'id': _summaries[index].id,
+                                'title': _summaries[index]
+                                        .originalDocuments
+                                        .isNotEmpty
+                                    ? _summaries[index]
+                                        .originalDocuments
+                                        .first
+                                        .title
+                                    : 'Untitled Summary',
+                                'date': _summaries[index]
+                                    .createdAt
+                                    .toIso8601String(),
+                                'isPinned': _summaries[index].isPinned,
+                              },
                               onTogglePin: _togglePin,
                               isEmpty: false,
                             ),
@@ -288,26 +370,57 @@ class SummariesState extends State<Summaries>
     );
   }
 
-  void _togglePin(String id) {
-    setState(() {
-      final summaryIndex =
-          summaries.indexWhere((summary) => summary['id'] == id);
-      if (summaryIndex != -1) {
-        summaries[summaryIndex]['isPinned'] =
-            !(summaries[summaryIndex]['isPinned'] as bool);
+  void _togglePin(String id) async {
+    try {
+      // Find the summary in the list
+      Summary? summaryToToggle =
+          _summaries.firstWhere((summary) => summary.id == id);
+
+      // Get the current user
+      final firebaseUser = firebase_auth.FirebaseAuth.instance.currentUser;
+      if (firebaseUser == null) {
+        _showToast('Please log in to pin summaries', isError: true);
+        return;
       }
-    });
+
+      // Toggle the pinned status
+      summaryToToggle.isPinned = !summaryToToggle.isPinned;
+
+      // Update in the database
+      await _database.updateSummary(summaryToToggle);
+
+      // Update the local list
+      setState(() {
+        // Find and update the summary in the list
+        int index = _summaries.indexWhere((summary) => summary.id == id);
+        if (index != -1) {
+          _summaries[index] = summaryToToggle;
+        }
+      });
+
+      // Show success toast
+      _showToast(summaryToToggle.isPinned
+          ? 'Summary pinned successfully'
+          : 'Summary unpinned successfully');
+    } catch (e) {
+      // Handle any errors
+      _showToast('Failed to toggle pin status', isError: true);
+      print('Error toggling pin: $e');
+    }
+  }
+
+  void _showToast(String message, {bool isError = false}) {
     Fluttertoast.showToast(
-      msg: "Summary Pinned",
+      msg: message,
       toastLength: Toast.LENGTH_SHORT,
       gravity: ToastGravity.BOTTOM,
-      backgroundColor: AppColors.gradientMiddle,
+      backgroundColor: isError ? Colors.red : AppColors.gradientMiddle,
       textColor: Colors.white,
     );
   }
 
   Future<void> _handleRefresh() async {
     CustomBottomNavBar.updateLastMainRoute('/summaries');
-    await Future.delayed(const Duration(seconds: 2));
+    await _loadData();
   }
 }

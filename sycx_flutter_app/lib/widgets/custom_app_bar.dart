@@ -2,11 +2,12 @@ import 'package:flutter/material.dart';
 import 'dart:ui';
 import 'package:sycx_flutter_app/utils/constants.dart';
 import 'package:sycx_flutter_app/widgets/user_avatar.dart';
+import 'package:sycx_flutter_app/models/user.dart' as app_user;
 
 class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
   final bool showBackground;
   final String title;
-  final Map<String, String> user;
+  final app_user.User? user;
 
   const CustomAppBar({
     super.key,
@@ -62,7 +63,7 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
           actions: [
             Padding(
               padding: const EdgeInsets.only(right: 16),
-              child: UserAvatar(user: user),
+              child: UserAvatar(user: user!),
             ),
           ],
         ),

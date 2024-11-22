@@ -7,6 +7,9 @@ class Summary {
   final String summaryContent;
   final DateTime createdAt;
   final DateTime updatedAt;
+  bool isPinned;
+  String? title;
+  String? imageUrl;
 
   Summary({
     required this.id,
@@ -15,34 +18,60 @@ class Summary {
     required this.summaryContent,
     required this.createdAt,
     required this.updatedAt,
-  });
+    this.isPinned = false,
+    this.imageUrl,
+  }) {
+    title = originalDocuments.isNotEmpty
+        ? originalDocuments.first.title
+        : 'Untitled';
+  }
 
   factory Summary.fromFirestore(DocumentSnapshot doc) {
     Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
+
+    List<OriginalDocument> documents = [];
+    if (data['originalDocuments'] != null) {
+      documents = (data['originalDocuments'] as List<dynamic>)
+          .map((doc) => OriginalDocument.fromMap(doc as Map<String, dynamic>))
+          .toList();
+    }
+
+    DateTime created = (data['createdAt'] as Timestamp).toDate();
+    DateTime updated = (data['updatedAt'] as Timestamp).toDate();
+
     return Summary(
       id: doc.id,
       userId: data['userId'] ?? '',
-      originalDocuments: (data['originalDocuments'] as List<dynamic>?)
-              ?.map((doc) => OriginalDocument.fromMap(doc))
-              .toList() ??
-          [],
+      originalDocuments: documents,
       summaryContent: data['summaryContent'] ?? '',
-      createdAt: (data['createdAt'] as Timestamp).toDate(),
-      updatedAt: (data['updatedAt'] as Timestamp).toDate(),
+      createdAt: created,
+      updatedAt: updated,
+      isPinned: data['isPinned'] ?? false,
+      imageUrl: data['imageUrl'],
     );
   }
 
   factory Summary.fromJson(Map<String, dynamic> json) {
     return Summary(
-      id: json['id'],
-      userId: json['userId'],
+      id: json['id'] ?? '',
+      userId: json['userId'] ?? '',
       originalDocuments: (json['originalDocuments'] as List<dynamic>?)
-              ?.map((doc) => OriginalDocument.fromMap(doc))
+              ?.map((doc) =>
+                  OriginalDocument.fromMap(doc as Map<String, dynamic>))
               .toList() ??
           [],
-      summaryContent: json['summaryContent'],
-      createdAt: DateTime.parse(json['createdAt']),
-      updatedAt: DateTime.parse(json['updatedAt']),
+      summaryContent: json['summaryContent'] ?? '',
+      createdAt: json['createdAt'] != null
+          ? (json['createdAt'] is DateTime
+              ? json['createdAt']
+              : DateTime.parse(json['createdAt']))
+          : DateTime.now(),
+      updatedAt: json['updatedAt'] != null
+          ? (json['updatedAt'] is DateTime
+              ? json['updatedAt']
+              : DateTime.parse(json['updatedAt']))
+          : DateTime.now(),
+      isPinned: json['isPinned'] ?? false,
     );
   }
 
@@ -53,23 +82,63 @@ class Summary {
       'summaryContent': summaryContent,
       'createdAt': Timestamp.fromDate(createdAt),
       'updatedAt': Timestamp.fromDate(updatedAt),
+      'isPinned': isPinned,
+      'title': title,
+      'imageUrl': imageUrl,
     };
+  }
+
+  Map<String, dynamic> toCardFormat() {
+    return {
+      'id': id,
+      'title': title ?? 'Untitled',
+      'originalDocuments': originalDocuments.map((doc) => doc.toMap()).toList(),
+      'createdAt': createdAt,
+      'updatedAt': updatedAt,
+      'isPinned': isPinned,
+      'summaryContent': summaryContent,
+    };
+  }
+
+  Summary copyWith({
+    String? id,
+    String? userId,
+    List<OriginalDocument>? originalDocuments,
+    String? summaryContent,
+    DateTime? createdAt,
+    DateTime? updatedAt,
+    bool? isPinned,
+    String? imageUrl,
+  }) {
+    return Summary(
+      id: id ?? this.id,
+      userId: userId ?? this.userId,
+      originalDocuments: originalDocuments ?? this.originalDocuments,
+      summaryContent: summaryContent ?? this.summaryContent,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      isPinned: isPinned ?? this.isPinned,
+      imageUrl: imageUrl ?? this.imageUrl,
+    );
   }
 }
 
 class OriginalDocument {
   final String title;
   final String content;
+  final String? type;
 
   OriginalDocument({
     required this.title,
     required this.content,
+    this.type,
   });
 
   factory OriginalDocument.fromMap(Map<String, dynamic> map) {
     return OriginalDocument(
       title: map['title'] ?? '',
       content: map['content'] ?? '',
+      type: map['type'],
     );
   }
 
@@ -77,6 +146,7 @@ class OriginalDocument {
     return {
       'title': title,
       'content': content,
+      if (type != null) 'type': type,
     };
   }
 }

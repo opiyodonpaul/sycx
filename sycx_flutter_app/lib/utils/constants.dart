@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 const String baseUrl = 'http://10.0.2.2:5000';
-// const String baseUrl = 'https://sycx.up.railway.app';
+// const String baseUrl = 'https://sycx.onrender.com';
+const String accessKey = 'es3EmOY-JpODxTpk51-VgMkrGeZwGZKE8xKDqW_Bdkk';
 
 class AppColors {
   static const Color gradientStart = Color(0xFF6A11CB);

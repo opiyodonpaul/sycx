@@ -1,7 +1,11 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
 import 'package:fluttertoast/fluttertoast.dart';
-import 'package:sycx_flutter_app/dummy_data.dart';
+import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
+import 'package:sycx_flutter_app/models/user.dart' as app_user;
+import 'package:sycx_flutter_app/models/summary.dart';
+import 'package:sycx_flutter_app/services/database.dart';
 import 'package:sycx_flutter_app/screens/search_results.dart';
 import 'package:sycx_flutter_app/utils/constants.dart';
 import 'package:sycx_flutter_app/widgets/custom_app_bar.dart';
@@ -23,11 +27,15 @@ class HomeState extends State<Home> with SingleTickerProviderStateMixin {
   bool _showAppBarBackground = false;
   late AnimationController _animationController;
 
-  List summaries = DummyData.summaries;
-  List<String> searches = List<String>.from(DummyData.searches);
+  List<Summary> _summaries = [];
+  List<String> _searches = [];
   bool _isLoading = true;
   final TextEditingController _searchController = TextEditingController();
   final FocusNode _searchFocusNode = FocusNode();
+
+  // User data
+  app_user.User? _currentUser;
+  final Database _database = Database();
 
   @override
   void initState() {
@@ -42,12 +50,73 @@ class HomeState extends State<Home> with SingleTickerProviderStateMixin {
   }
 
   Future<void> _loadData() async {
-    await Future.delayed(const Duration(seconds: 2));
-    if (mounted) {
-      setState(() {
-        _isLoading = false;
-      });
-      _animationController.forward();
+    try {
+      // Get current user ID
+      final firebaseUser = firebase_auth.FirebaseAuth.instance.currentUser;
+      if (firebaseUser != null) {
+        // Fetch user data
+        final user = await _database.getUser(firebaseUser.uid);
+
+        // Fetch recent summaries (latest 4)
+        final summaries = await _database.getUserSummaries(firebaseUser.uid);
+
+        // Fetch recent searches (latest 5)
+        final searches = await _fetchRecentSearches(firebaseUser.uid);
+
+        if (mounted) {
+          setState(() {
+            _currentUser = user;
+            _summaries = summaries.length > 4
+                ? summaries.sublist(summaries.length - 4).reversed.toList()
+                : summaries.reversed.toList();
+            _searches = searches;
+            _isLoading = false;
+          });
+          _animationController.forward();
+        }
+      }
+    } catch (e) {
+      print('Error loading data: $e');
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  Future<List<String>> _fetchRecentSearches(String userId) async {
+    try {
+      // Implement a method to fetch recent searches from Firestore
+      // You'll need to create a 'searches' collection in Firestore
+      QuerySnapshot searchesSnapshot = await _database.firestore
+          .collection('searches')
+          .where('userId', isEqualTo: userId)
+          .orderBy('timestamp', descending: true)
+          .limit(5)
+          .get();
+
+      return searchesSnapshot.docs
+          .map((doc) => doc['query'] as String)
+          .toList();
+    } catch (e) {
+      print('Error fetching searches: $e');
+      return [];
+    }
+  }
+
+  Future<void> _saveSearch(String query) async {
+    try {
+      final firebaseUser = firebase_auth.FirebaseAuth.instance.currentUser;
+      if (firebaseUser != null) {
+        await _database.firestore.collection('searches').add({
+          'userId': firebaseUser.uid,
+          'query': query,
+          'timestamp': FieldValue.serverTimestamp(),
+        });
+      }
+    } catch (e) {
+      print('Error saving search: $e');
     }
   }
 
@@ -76,7 +145,7 @@ class HomeState extends State<Home> with SingleTickerProviderStateMixin {
         : Scaffold(
             extendBodyBehindAppBar: true,
             appBar: CustomAppBar(
-              user: DummyData.user,
+              user: _currentUser,
               showBackground: false,
               title: 'SycX',
             ),
@@ -123,16 +192,46 @@ class HomeState extends State<Home> with SingleTickerProviderStateMixin {
             );
           },
           child: RecentSearchesCard(
-            searches: searches,
-            onClearAll: () {
-              setState(() {
-                searches.clear();
-              });
+            searches: _searches,
+            onClearAll: () async {
+              final firebaseUser = firebase_auth.FirebaseAuth.instance.currentUser;
+              if (firebaseUser != null) {
+                // Implement method to clear all searches for the user
+                await _database.firestore
+                    .collection('searches')
+                    .where('userId', isEqualTo: firebaseUser.uid)
+                    .get()
+                    .then((snapshot) {
+                  for (DocumentSnapshot doc in snapshot.docs) {
+                    doc.reference.delete();
+                  }
+                });
+
+                setState(() {
+                  _searches.clear();
+                });
+              }
             },
-            onRemoveSearch: (index) {
-              setState(() {
-                searches.removeAt(index);
-              });
+            onRemoveSearch: (index) async {
+              final firebaseUser = firebase_auth.FirebaseAuth.instance.currentUser;
+              if (firebaseUser != null) {
+                // Implement method to remove a specific search
+                final searchQuery = _searches[index];
+                await _database.firestore
+                    .collection('searches')
+                    .where('userId', isEqualTo: firebaseUser.uid)
+                    .where('query', isEqualTo: searchQuery)
+                    .get()
+                    .then((snapshot) {
+                  for (DocumentSnapshot doc in snapshot.docs) {
+                    doc.reference.delete();
+                  }
+                });
+
+                setState(() {
+                  _searches.removeAt(index);
+                });
+              }
             },
             onEmptySearchTap: () {
               _searchFocusNode.requestFocus();
@@ -209,7 +308,7 @@ class HomeState extends State<Home> with SingleTickerProviderStateMixin {
       children: [
         Expanded(
           child: Text(
-            '$greeting ${DummyData.user['name']} 👋',
+            '$greeting ${_currentUser?.name ?? 'User'} 👋',
             style: AppTextStyles.headingStyleWithShadow.copyWith(fontSize: 24),
             overflow: TextOverflow.ellipsis,
           ),
@@ -255,9 +354,12 @@ class HomeState extends State<Home> with SingleTickerProviderStateMixin {
           prefixIcon: Icons.search,
           onFieldSubmitted: (value) {
             if (value.isNotEmpty) {
+              // Save the search
+              _saveSearch(value);
+
               setState(() {
-                if (!searches.contains(value)) {
-                  searches.insert(0, value);
+                if (!_searches.contains(value)) {
+                  _searches.insert(0, value);
                 }
               });
               Navigator.push(
@@ -283,14 +385,14 @@ class HomeState extends State<Home> with SingleTickerProviderStateMixin {
             end: Offset.zero,
           )
               .animate(CurvedAnimation(
-                  parent: _animationController,
-                  curve: const Interval(0.4, 1.0, curve: Curves.easeOut)))
+              parent: _animationController,
+              curve: const Interval(0.4, 1.0, curve: Curves.easeOut)))
               .value,
           child: Opacity(
             opacity: Tween<double>(begin: 0.0, end: 1.0)
                 .animate(CurvedAnimation(
-                    parent: _animationController,
-                    curve: const Interval(0.4, 1.0, curve: Curves.easeOut)))
+                parent: _animationController,
+                curve: const Interval(0.4, 1.0, curve: Curves.easeOut)))
                 .value,
             child: child,
           ),
@@ -317,7 +419,7 @@ class HomeState extends State<Home> with SingleTickerProviderStateMixin {
                 crossAxisSpacing: 16,
                 mainAxisSpacing: 16,
               ),
-              itemCount: summaries.isEmpty ? 1 : summaries.length,
+              itemCount: _summaries.isEmpty ? 1 : _summaries.length,
               itemBuilder: (context, index) {
                 return AnimationConfiguration.staggeredGrid(
                   position: index,
@@ -325,23 +427,30 @@ class HomeState extends State<Home> with SingleTickerProviderStateMixin {
                   columnCount: 2,
                   child: ScaleAnimation(
                     child: FadeInAnimation(
-                      child: summaries.isEmpty
+                      child: _summaries.isEmpty
                           ? SummaryCard(
-                              summary: {
-                                'id': 'empty',
-                                'title': 'No summaries yet',
-                                'date': DateTime.now().toIso8601String(),
-                                'image': 'assets/images/card.png',
-                                'isPinned': false,
-                              },
-                              onTogglePin: (_) {},
-                              isEmpty: true,
-                            )
+                        summary: {
+                          'id': 'empty',
+                          'title': 'No summaries yet',
+                          'date': DateTime.now().toIso8601String(),
+                          'image': 'assets/images/card.png',
+                          'isPinned': false,
+                        },
+                        onTogglePin: (_) {},
+                        isEmpty: true,
+                      )
                           : SummaryCard(
-                              summary: summaries[index],
-                              onTogglePin: _togglePin,
-                              isEmpty: false,
-                            ),
+                        summary: {
+                          'id': _summaries[index].id,
+                          'title': _summaries[index].originalDocuments.isNotEmpty
+                              ? _summaries[index].originalDocuments.first.title
+                              : 'Untitled Summary',
+                          'date': _summaries[index].createdAt.toIso8601String(),
+                          'isPinned': _summaries[index].isPinned,
+                        },
+                        onTogglePin: _togglePin,
+                        isEmpty: false,
+                      ),
                     ),
                   ),
                 );
@@ -353,26 +462,59 @@ class HomeState extends State<Home> with SingleTickerProviderStateMixin {
     );
   }
 
-  void _togglePin(String id) {
-    setState(() {
-      final summaryIndex =
-          summaries.indexWhere((summary) => summary['id'] == id);
-      if (summaryIndex != -1) {
-        summaries[summaryIndex]['isPinned'] =
-            !(summaries[summaryIndex]['isPinned'] as bool);
+  void _togglePin(String id) async {
+    try {
+      // Find the summary in the list
+      Summary? summaryToToggle = _summaries.firstWhere((summary) => summary.id == id);
+
+      // Get the current user
+      final firebaseUser = firebase_auth.FirebaseAuth.instance.currentUser;
+      if (firebaseUser == null) {
+        _showToast('Please log in to pin summaries', isError: true);
+        return;
       }
-    });
+
+      // Toggle the pinned status
+      summaryToToggle.isPinned = !summaryToToggle.isPinned;
+
+      // Update in the database
+      await _database.updateSummary(summaryToToggle);
+
+      // Update the local list
+      setState(() {
+        // Find and update the summary in the list
+        int index = _summaries.indexWhere((summary) => summary.id == id);
+        if (index != -1) {
+          _summaries[index] = summaryToToggle;
+        }
+      });
+
+      // Show success toast
+      _showToast(summaryToToggle.isPinned
+          ? 'Summary pinned successfully'
+          : 'Summary unpinned successfully');
+
+    } catch (e) {
+      // Handle any errors
+      _showToast('Failed to toggle pin status', isError: true);
+      print('Error toggling pin: $e');
+    }
+  }
+
+  void _showToast(String message, {bool isError = false}) {
     Fluttertoast.showToast(
-      msg: "Summary Pinned",
+      msg: message,
       toastLength: Toast.LENGTH_SHORT,
       gravity: ToastGravity.BOTTOM,
-      backgroundColor: AppColors.gradientMiddle,
+      backgroundColor: isError
+          ? Colors.red
+          : AppColors.gradientMiddle,
       textColor: Colors.white,
     );
   }
 
   Future<void> _handleRefresh() async {
     CustomBottomNavBar.updateLastMainRoute('/home');
-    await Future.delayed(const Duration(seconds: 2));
+    await _loadData();
   }
 }

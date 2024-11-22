@@ -6,7 +6,6 @@ import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter_svg/svg.dart';
 import 'package:fluttertoast/fluttertoast.dart';
-import 'package:sycx_flutter_app/dummy_data.dart';
 import 'package:sycx_flutter_app/services/summary.dart';
 import 'package:sycx_flutter_app/utils/constants.dart';
 import 'package:sycx_flutter_app/widgets/animated_button.dart';
@@ -17,6 +16,7 @@ import 'package:sycx_flutter_app/widgets/padded_round_slider_value_indicator_sha
 import 'package:dotted_border/dotted_border.dart';
 import 'package:syncfusion_flutter_pdfviewer/pdfviewer.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:sycx_flutter_app/models/user.dart' as app_user;
 
 class Upload extends StatefulWidget {
   const Upload({super.key});
@@ -51,6 +51,9 @@ class UploadState extends State<Upload> with TickerProviderStateMixin {
   int _totalPdfPages = 0;
 
   static int maxFileSize = 1024 * 1024 * 1024; // 1GB
+
+  // User data
+  app_user.User? _currentUser;
 
   @override
   void initState() {
@@ -271,7 +274,7 @@ class UploadState extends State<Upload> with TickerProviderStateMixin {
     return Scaffold(
       extendBodyBehindAppBar: true,
       appBar: CustomAppBar(
-        user: DummyData.user,
+        user: _currentUser,
         showBackground: false,
         title: 'SycX',
       ),
