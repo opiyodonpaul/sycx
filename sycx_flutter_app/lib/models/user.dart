@@ -24,7 +24,7 @@ class User {
   });
 
   factory User.fromFirestore(DocumentSnapshot doc) {
-    Map data = doc.data() as Map<String, dynamic>;
+    Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
     return User(
       id: doc.id,
       fullName: data['fullName'] ?? '',
@@ -54,4 +54,8 @@ class User {
           : null,
     };
   }
+
+  // Add getters for compatibility
+  String get name => fullName;
+  String? get profileImage => userProfile;
 }

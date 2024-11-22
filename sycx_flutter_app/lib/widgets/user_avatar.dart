@@ -3,9 +3,10 @@ import 'package:sycx_flutter_app/screens/auth/login.dart';
 import 'package:sycx_flutter_app/utils/constants.dart';
 import 'package:sycx_flutter_app/services/auth.dart';
 import 'package:sycx_flutter_app/widgets/loading.dart';
+import 'package:sycx_flutter_app/models/user.dart' as app_user;
 
 class UserAvatar extends StatelessWidget {
-  final Map<String, String> user;
+  final app_user.User user;
   final Auth _auth = Auth();
 
   UserAvatar({super.key, required this.user});
@@ -18,14 +19,19 @@ class UserAvatar extends StatelessWidget {
       builder: (BuildContext context) => const Loading(),
     );
 
-    // Perform logout
-    await _auth.signOut();
+    try {
+      // Perform logout
+      await _auth.signOut();
 
-    // Close loading screen and navigate to login
-    Navigator.of(context).pushAndRemoveUntil(
-      MaterialPageRoute(builder: (context) => const Login()),
-      (Route<dynamic> route) => false,
-    );
+      // Close loading screen and navigate to login
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (context) => const Login()),
+        (Route<dynamic> route) => false,
+      );
+    } catch (e) {
+      // Dismiss loading screen
+      Navigator.of(context).pop();
+    }
   }
 
   @override
@@ -40,12 +46,18 @@ class UserAvatar extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(user['name']!,
-                  style: AppTextStyles.subheadingStyle
-                      .copyWith(color: AppColors.primaryTextColor)),
-              Text('Logged in as ${user['email']}',
-                  style: AppTextStyles.bodyTextStyle.copyWith(
-                      fontSize: 12, color: AppColors.secondaryTextColor)),
+              Text(
+                user.fullName,
+                style: AppTextStyles.subheadingStyle
+                    .copyWith(color: AppColors.primaryTextColor),
+              ),
+              Text(
+                'Logged in as ${user.email}',
+                style: AppTextStyles.bodyTextStyle.copyWith(
+                  fontSize: 12,
+                  color: AppColors.secondaryTextColor,
+                ),
+              ),
               const Divider(color: AppColors.textFieldBorderColor),
             ],
           ),
@@ -53,9 +65,11 @@ class UserAvatar extends StatelessWidget {
         PopupMenuItem(
           child: TextButton.icon(
             icon: const Icon(Icons.person, color: AppColors.primaryButtonColor),
-            label: Text('Profile',
-                style: AppTextStyles.bodyTextStyle
-                    .copyWith(color: AppColors.primaryButtonColor)),
+            label: Text(
+              'Profile',
+              style: AppTextStyles.bodyTextStyle
+                  .copyWith(color: AppColors.primaryButtonColor),
+            ),
             onPressed: () {
               Navigator.of(context).pushNamed('/profile');
             },
@@ -64,9 +78,11 @@ class UserAvatar extends StatelessWidget {
         PopupMenuItem(
           child: TextButton.icon(
             icon: const Icon(Icons.logout, color: AppColors.gradientEnd),
-            label: Text('Logout',
-                style: AppTextStyles.bodyTextStyle
-                    .copyWith(color: AppColors.gradientEnd)),
+            label: Text(
+              'Logout',
+              style: AppTextStyles.bodyTextStyle
+                  .copyWith(color: AppColors.gradientEnd),
+            ),
             onPressed: () {
               Navigator.of(context).pop(); // Close the popup menu
               _handleLogout(context);
@@ -85,7 +101,7 @@ class UserAvatar extends StatelessWidget {
         child: Padding(
           padding: const EdgeInsets.all(2),
           child: CircleAvatar(
-            backgroundImage: NetworkImage(user['avatar']!),
+            backgroundImage: NetworkImage(user.userProfile),
           ),
         ),
       ),

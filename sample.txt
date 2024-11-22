@@ -1,3 +1,0 @@
-This is a sample document for testing the document analysis endpoint. 
-It contains multiple sentences and paragraphs.
-The API should be able to analyze this content and provide meaningful insights.

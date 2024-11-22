@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:sycx_flutter_app/services/api_client.dart';
 import 'package:sycx_flutter_app/services/database.dart';
+import 'package:sycx_flutter_app/services/unsplash.dart';
 import 'package:sycx_flutter_app/utils/secure_storage.dart';
 import 'package:sycx_flutter_app/models/summary.dart';
 
@@ -31,14 +32,14 @@ class SummaryService {
         'Accept': 'application/json',
       };
 
-      // Send the request with a timeout of 5 minutes
+      // Send the request with a timeout of 10 minutes
       final response = await http
           .post(
             url,
             headers: headers,
             body: jsonEncode(payload),
           )
-          .timeout(const Duration(minutes: 5));
+          .timeout(const Duration(minutes: 10));
 
       if (response.statusCode == 200) {
         final jsonResponse = jsonDecode(response.body);
@@ -48,14 +49,18 @@ class SummaryService {
         }
 
         // Process and decode any base64 encoded data in the response
-        final summaries = (jsonResponse['summaries'] as List).map((summary) {
-          // Create original documents list
+        final summaries = (jsonResponse['summaries'] as List).map((summary) async {
           final originalDocuments = documents
               .map((doc) => OriginalDocument(
-                    title: doc['name'],
-                    content: doc['content'],
-                  ))
+            title: doc['name'],
+            content: doc['content'],
+          ))
               .toList();
+
+          // Get image URL from Unsplash based on the first document's title
+          final imageUrl = await Unsplash.getRandomImageUrl(
+            originalDocuments.first.title,
+          );
 
           String summaryContent;
           // Check if the content is base64 encoded PDF or plain text
@@ -76,17 +81,17 @@ class SummaryService {
             summaryContent: summaryContent,
             createdAt: DateTime.now(),
             updatedAt: DateTime.now(),
+            imageUrl: imageUrl,
           );
 
-          // Save each summary to Firebase
-          database.createSummary(newSummary).catchError((error) {
-            print('Error saving summary to database: $error');
-          });
+          // Save to Firebase
+          await database.createSummary(newSummary);
 
           return newSummary;
         }).toList();
 
-        return summaries;
+        // Wait for all summaries to be processed
+        return await Future.wait(summaries);
       } else {
         final errorMessage = _parseErrorResponse(response);
         throw Exception('Failed to summarize documents: $errorMessage');
