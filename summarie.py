@@ -19,12 +19,6 @@ import matplotlib
 # Force matplotlib to use non-interactive backend
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
-from reportlab.lib.pagesizes import letter
-from reportlab.pdfgen import canvas
-from reportlab.lib.utils import ImageReader
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image as ReportLabImage
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.lib.units import inch
 from cachetools import TTLCache, LRUCache
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import List, Dict, Optional
@@ -34,6 +28,12 @@ import weakref
 from functools import lru_cache
 import tempfile
 import atexit
+from reportlab.platypus import Paragraph, Spacer, Image as ReportLabImage
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.units import inch
+from reportlab.lib.pagesizes import letter
+from reportlab.platypus import SimpleDocTemplate
+from reportlab.lib.utils import ImageReader
 
 # Create logs directory if it doesn't exist
 os.makedirs('logs', exist_ok=True)
@@ -104,33 +104,56 @@ def fetch_with_retries(fetch_func, retries=3, delay=2, *args, **kwargs):
     return []
 
 def generate_summary(model, documents, summary_depth: float = 0.3, language: str = 'english') -> List[dict]:
+    """
+    Enhanced summary generation with robust error handling and flexible processing.
+    
+    Args:
+        model: Summarization model instance
+        documents (list): List of document dictionaries
+        summary_depth (float): Depth of summarization
+        language (str): Language of summarization
+    
+    Returns:
+        List of summary dictionaries
+    """
     if not documents:
         return []
 
     try:
         total_docs = len(documents)
         if total_docs == 0:
-            raise ValueError("No documents provided")
+            raise ValueError("No valid documents provided")
 
         summary = []
         max_workers = min(os.cpu_count() or 1, total_docs)
 
+        # Improved error handling in ThreadPoolExecutor
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            future_summaries = [
-                executor.submit(
-                    model.generate_summary,
-                    doc.get('content', ''),
-                    summary_depth
-                )
-                for doc in documents if doc.get('content')
-            ]
+            future_summaries = {}
+            for i, doc in enumerate(documents):
+                # Ensure content is not None and has sufficient length
+                content = doc.get('content', '').strip()
+                if content:
+                    future = executor.submit(
+                        _safe_generate_summary, 
+                        model, 
+                        content, 
+                        summary_depth
+                    )
+                    future_summaries[future] = {
+                        'title': doc.get('name', f'Document {i+1}'),
+                        'index': i
+                    }
 
-            for i, future in enumerate(as_completed(future_summaries)):
+            # Process completed futures
+            for future in as_completed(future_summaries):
                 try:
                     doc_summary = future.result()
-                    if doc_summary and i < len(documents):
+                    metadata = future_summaries[future]
+                    
+                    if doc_summary:
                         summary_data = {
-                            'title': documents[i].get('name', f'Document {i+1}'),
+                            'title': metadata['title'],
                             'content': doc_summary
                         }
                         try:
@@ -140,16 +163,40 @@ def generate_summary(model, documents, summary_depth: float = 0.3, language: str
                             logging.warning(f"Visual enhancement failed: {str(visual_error)}")
                             summary.append(summary_data)
                 except Exception as e:
-                    logging.error(f"Error processing document {i}: {str(e)}")
-                finally:
-                    future.cancel()
+                    logging.error(f"Error processing document: {str(e)}")
 
         return summary
+
     except Exception as e:
         logging.error(f"Error in generate_summary: {str(e)}")
         return []
     finally:
         cleanup_resources()
+
+def _safe_generate_summary(model, content, summary_depth):
+    """
+    Safely generate summary with fallback mechanisms.
+    
+    Args:
+        model: Summarization model
+        content (str): Document content
+        summary_depth (float): Summarization depth
+    
+    Returns:
+        str: Generated summary or original content if summarization fails
+    """
+    try:
+        # Limit content length to prevent excessive processing
+        max_content_length = 100000
+        truncated_content = content[:max_content_length]
+        
+        # Attempt summarization with fallback
+        summary = model.generate_summary(truncated_content, summary_depth)
+        
+        return summary if summary and len(summary) > 10 else truncated_content
+    except Exception as e:
+        logging.error(f"Summary generation error: {str(e)}")
+        return content  # Return original content if summarization fails
 
 def format_summary(summary):
     if not summary:
@@ -232,7 +279,7 @@ def fetch_images_from_multiple_sources(keywords):
     try:
         with ThreadPoolExecutor(max_workers=2) as executor:
             futures = []
-            for keyword in keywords[:1]:
+            for keyword in keywords:
                 for api_name, fetch_func in apis.items():
                     if check_rate_limit(api_name):
                         futures.append(
@@ -252,7 +299,7 @@ def fetch_images_from_multiple_sources(keywords):
                 finally:
                     future.cancel()
 
-        return images[:3]
+        return images
     except Exception as e:
         logging.error(f"Error in fetch_images_from_multiple_sources: {str(e)}")
         return []
@@ -427,206 +474,6 @@ def insert_visuals_into_summary(summary, images, wordcloud):
         logging.error(f"Error in insert_visuals_into_summary: {str(e)}")
         return summary
 
-def convert_summary_to_pdf(summary_content):
-    if not summary_content:
-        raise ValueError("No content provided for PDF conversion")
-
-    try:
-        buffer = BytesIO()
-        doc = SimpleDocTemplate(
-            buffer,
-            pagesize=letter,
-            rightMargin=72,
-            leftMargin=72,
-            topMargin=72,
-            bottomMargin=18
-        )
-        
-        styles = getSampleStyleSheet()
-        custom_style = ParagraphStyle(
-            'CustomStyle',
-            parent=styles['Normal'],
-            fontSize=11,
-            leading=14,
-            spaceAfter=12,
-            spaceBefore=12
-        )
-        
-        title_style = ParagraphStyle(
-            'TitleStyle',
-            parent=styles['Heading1'],
-            fontSize=24,
-            spaceAfter=30,
-            spaceBefore=30,
-            alignment=1
-        )
-        
-        heading_style = ParagraphStyle(
-            'HeadingStyle',
-            parent=styles['Heading1'],
-            fontSize=16,
-            spaceAfter=12,
-            spaceBefore=24
-        )
-        
-        story = []
-        story.append(Paragraph("Summary Report", title_style))
-        story.append(Spacer(1, 60))
-
-        # Convert markdown to HTML and clean it up
-        html = markdown.markdown(summary_content)
-        
-        # Process content by type
-        elements = []
-        current_text = ""
-        
-        # Split content into images and text
-        for line in summary_content.split('\n'):
-            if line.startswith('!['):
-                if current_text:
-                    elements.append(('text', current_text.strip()))
-                    current_text = ""
-                
-                # Extract image URL
-                img_match = re.search(r'\((.*?)\)', line)
-                if img_match:
-                    elements.append(('image', img_match.group(1)))
-            else:
-                current_text += line + "\n"
-        
-        if current_text:
-            elements.append(('text', current_text.strip()))
-
-        # Create a session for reuse
-        session = requests.Session()
-
-        # Process each element
-        for element_type, content in elements:
-            try:
-                if element_type == 'text':
-                    # Process text content
-                    paragraphs = content.split('\n')
-                    for para in paragraphs:
-                        para = para.strip()
-                        if not para:
-                            continue
-                            
-                        # Handle headings
-                        if para.startswith('#'):
-                            level = len(re.match(r'^#+', para).group())
-                            text = para.lstrip('#').strip()
-                            story.append(Paragraph(text, heading_style))
-                        
-                        # Handle bullet points
-                        elif para.startswith('*') or para.startswith('-'):
-                            text = para.lstrip('*- ').strip()
-                            story.append(Paragraph(
-                                f"• {text}",
-                                ParagraphStyle(
-                                    'BulletStyle',
-                                    parent=custom_style,
-                                    leftIndent=20,
-                                    bulletIndent=10
-                                )
-                            ))
-                        
-                        # Regular paragraphs
-                        else:
-                            story.append(Paragraph(para, custom_style))
-                            
-                elif element_type == 'image':
-                    try:
-                        img_data = None
-                        if content.startswith('data:image/png;base64,'):
-                            # Handle base64 encoded images (like wordcloud)
-                            img_data = base64.b64decode(content.split(',')[1])
-                        else:
-                            # Handle URL images
-                            try:
-                                response = session.get(content, stream=True, timeout=10)
-                                response.raise_for_status()
-                                img_data = response.content
-                            except requests.RequestException as e:
-                                logging.error(f"Error fetching image from URL: {str(e)}")
-                                continue
-
-                        if img_data:
-                            # Create a temporary file for the image
-                            with tempfile.NamedTemporaryFile(delete=False, suffix='.jpg') as tmp_file:
-                                # Process and save the image
-                                img = Image.open(BytesIO(img_data))
-                                
-                                # Convert RGBA to RGB if necessary
-                                if img.mode in ('RGBA', 'P'):
-                                    img = img.convert('RGB')
-                                
-                                # Calculate dimensions
-                                max_width = 6 * inch
-                                img_width, img_height = img.size
-                                aspect = img_height / float(img_width)
-                                
-                                desired_width = min(max_width, img_width)
-                                desired_height = aspect * desired_width
-                                
-                                # Save optimized image
-                                img.save(tmp_file.name, format='JPEG', quality=85)
-                                
-                                # Add image to story
-                                story.append(Spacer(1, 12))
-                                story.append(ReportLabImage(
-                                    tmp_file.name,
-                                    width=desired_width,
-                                    height=desired_height
-                                ))
-                                story.append(Spacer(1, 12))
-                                
-                                # Cleanup
-                                img.close()
-                                
-                                # Schedule file for deletion
-                                atexit.register(lambda: os.unlink(tmp_file.name))
-                        
-                    except Exception as img_error:
-                        logging.error(f"Error processing image in PDF: {str(img_error)}")
-                        continue
-
-            except Exception as e:
-                logging.error(f"Error processing element in PDF: {str(e)}")
-                continue
-
-            story.append(Spacer(1, 6))
-
-        # Add page numbers
-        def add_page_number(canvas, doc):
-            canvas.saveState()
-            canvas.setFont('Helvetica', 9)
-            canvas.drawRightString(
-                doc.pagesize[0] - doc.rightMargin,
-                doc.bottomMargin,
-                f"Page {doc.page}"
-            )
-            canvas.restoreState()
-
-        # Build PDF
-        doc.build(
-            story,
-            onFirstPage=add_page_number,
-            onLaterPages=add_page_number
-        )
-        
-        buffer.seek(0)
-        return buffer.getvalue()
-        
-    except Exception as e:
-        logging.error(f"Error converting summary to PDF: {str(e)}")
-        raise
-    finally:
-        # Cleanup
-        if 'session' in locals():
-            session.close()
-        cleanup_resources()
-        gc.collect()
-
 def enrich_summary_with_visuals(summary: dict) -> dict:
     if not summary or not isinstance(summary, dict):
         return summary
@@ -662,9 +509,12 @@ def enrich_summary_with_visuals(summary: dict) -> dict:
             logging.error(f"Error inserting visuals: {str(e)}")
             enriched_content = content
 
+        # Apply custom formatting and styling
+        formatted_summary = format_enriched_summary(enriched_content)
+
         return {
             'title': summary.get('title', ''),
-            'content': enriched_content
+            'content': formatted_summary
         }
     except Exception as e:
         logging.error(f"Error in enrich_summary_with_visuals: {str(e)}")
@@ -672,5 +522,44 @@ def enrich_summary_with_visuals(summary: dict) -> dict:
     finally:
         cleanup_resources()
 
-# Initialize NLTK data on module load
-download_nltk_data()
+def format_enriched_summary(summary: str) -> str:
+    """
+    Apply custom formatting and styling to the enriched summary.
+    """
+    try:
+        # Use a playful, youthful font
+        font_family = '"Architects Daughter", cursive'
+
+        # Create a structured layout with headings, subheadings, and paragraphs
+        formatted_paragraphs = []
+        for paragraph in summary.split('\n\n'):
+            paragraph = paragraph.strip()
+            if not paragraph:
+                continue
+
+            if paragraph.startswith('# '):
+                formatted_paragraphs.append(
+                    f'<h1 style="font-family: {font_family}; font-size: 32px; margin-bottom: 24px;">{paragraph[2:]}</h1>'
+                )
+            elif paragraph.startswith('## '):
+                formatted_paragraphs.append(
+                    f'<h2 style="font-family: {font_family}; font-size: 24px; margin-bottom: 18px;">{paragraph[3:]}</h2>'
+                )
+            else:
+                formatted_paragraphs.append(
+                    f'<p style="font-family: {font_family}; font-size: 16px; line-height: 1.5; margin-bottom: 12px;">{paragraph}</p>'
+                )
+
+        # Arrange the formatted paragraphs in a non-linear layout
+        formatted_summary = '<div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-start;">'
+        for i, para in enumerate(formatted_paragraphs):
+            if i % 2 == 0:
+                formatted_summary += f'<div style="width: 48%; margin-bottom: 24px;">{para}</div>'
+            else:
+                formatted_summary += f'<div style="width: 48%; margin-bottom: 24px; transform: translateY(-12px);">{para}</div>'
+        formatted_summary += '</div>'
+
+        return formatted_summary
+    except Exception as e:
+        logging.error(f"Error in format_enriched_summary: {str(e)}")
+        return summary

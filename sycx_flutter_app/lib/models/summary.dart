@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 class Summary {
@@ -9,21 +10,37 @@ class Summary {
   final DateTime updatedAt;
   bool isPinned;
   String? title;
-  String? imageUrl;
 
   Summary({
-    required this.id,
+    this.id = '',
     required this.userId,
     required this.originalDocuments,
     required this.summaryContent,
     required this.createdAt,
     required this.updatedAt,
     this.isPinned = false,
-    this.imageUrl,
   }) {
+    // Set title based on first original document or default
     title = originalDocuments.isNotEmpty
         ? originalDocuments.first.title
         : 'Untitled';
+  }
+
+  // Method to parse the summary content
+  Map<String, dynamic> parseSummaryContent() {
+    try {
+      return json.decode(summaryContent);
+    } catch (e) {
+      print('Error parsing summary content: $e');
+      return {};
+    }
+  }
+
+  // Method to get summary text (assuming a specific structure in the summary)
+  String getSummaryText() {
+    final parsedContent = parseSummaryContent();
+    // Adjust this based on the actual structure of your summary JSON
+    return parsedContent['summary'] ?? parsedContent['text'] ?? 'No summary available';
   }
 
   factory Summary.fromFirestore(DocumentSnapshot doc) {
@@ -47,7 +64,6 @@ class Summary {
       createdAt: created,
       updatedAt: updated,
       isPinned: data['isPinned'] ?? false,
-      imageUrl: data['imageUrl'],
     );
   }
 
@@ -84,7 +100,6 @@ class Summary {
       'updatedAt': Timestamp.fromDate(updatedAt),
       'isPinned': isPinned,
       'title': title,
-      'imageUrl': imageUrl,
     };
   }
 
@@ -108,7 +123,6 @@ class Summary {
     DateTime? createdAt,
     DateTime? updatedAt,
     bool? isPinned,
-    String? imageUrl,
   }) {
     return Summary(
       id: id ?? this.id,
@@ -118,14 +132,23 @@ class Summary {
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       isPinned: isPinned ?? this.isPinned,
-      imageUrl: imageUrl ?? this.imageUrl,
     );
+  }
+
+  // Method to decode base64 content of original documents
+  List<int> decodeDocumentContent(OriginalDocument doc) {
+    try {
+      return base64Decode(doc.content);
+    } catch (e) {
+      print('Error decoding document content: $e');
+      return [];
+    }
   }
 }
 
 class OriginalDocument {
   final String title;
-  final String content;
+  final String content; // Base64 encoded content
   final String? type;
 
   OriginalDocument({

@@ -42,4 +42,50 @@ class Feedback {
       'updatedAt': Timestamp.fromDate(updatedAt),
     };
   }
+
+  // Utility method to get rating as stars
+  String get ratingStars {
+    return '★' * rating.toInt() + '☆' * (5 - rating.toInt());
+  }
+
+  // Utility method to get a human-readable timestamp
+  String get formattedCreatedAt {
+    final now = DateTime.now();
+    final difference = now.difference(createdAt);
+
+    if (difference.inDays > 365) {
+      return '${(difference.inDays / 365).floor()} year${difference.inDays ~/ 365 > 1 ? 's' : ''} ago';
+    } else if (difference.inDays > 30) {
+      return '${(difference.inDays / 30).floor()} month${difference.inDays ~/ 30 > 1 ? 's' : ''} ago';
+    } else if (difference.inDays > 0) {
+      return '${difference.inDays} day${difference.inDays > 1 ? 's' : ''} ago';
+    } else if (difference.inHours > 0) {
+      return '${difference.inHours} hour${difference.inHours > 1 ? 's' : ''} ago';
+    } else if (difference.inMinutes > 0) {
+      return '${difference.inMinutes} minute${difference.inMinutes > 1 ? 's' : ''} ago';
+    } else {
+      return 'Just now';
+    }
+  }
+
+  // Method to create a copy of the feedback with optional updates
+  Feedback copyWith({
+    String? id,
+    String? userId,
+    String? summaryId,
+    String? feedbackText,
+    num? rating,
+    DateTime? createdAt,
+    DateTime? updatedAt,
+  }) {
+    return Feedback(
+      id: id ?? this.id,
+      userId: userId ?? this.userId,
+      summaryId: summaryId ?? this.summaryId,
+      feedbackText: feedbackText ?? this.feedbackText,
+      rating: rating ?? this.rating,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+    );
+  }
 }

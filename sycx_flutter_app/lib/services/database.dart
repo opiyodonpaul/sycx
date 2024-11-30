@@ -78,83 +78,132 @@ class Database {
   // Summary operations
   Future<void> createSummary(Summary summary) async {
     try {
-      final summaryData = summary.toFirestore();
       await firestore
           .collection('summaries')
           .doc(summary.id)
-          .set(summaryData);
+          .set(summary.toFirestore());
     } catch (e) {
-      print('Error creating summary in Firestore: $e');
+      print('Error creating summary: $e');
       rethrow;
     }
   }
 
-  Future<List<Summary>> getUserSummaries(String userId) async {
-    try {
-      final QuerySnapshot querySnapshot = await firestore
-          .collection('summaries')
-          .where('userId', isEqualTo: userId)
-          .orderBy('createdAt', descending: true)
-          .get();
+  // Fetch summaries for a specific user
+  Stream<List<Summary>> getUserSummaries(String userId) {
+    return firestore
+        .collection('summaries')
+        .where('userId', isEqualTo: userId)
+        .snapshots()
+        .map((snapshot) =>
+        snapshot.docs.map((doc) => Summary.fromFirestore(doc)).toList());
+  }
 
-      return querySnapshot.docs.map((doc) {
-        try {
-          return Summary.fromFirestore(doc);
-        } catch (e) {
-          print('Error parsing summary document ${doc.id}: $e');
-          // Return a default/empty summary instead of throwing
-          return Summary(
-            id: doc.id,
-            userId: userId,
-            originalDocuments: [],
-            summaryContent: '', // Added required field
-            createdAt: DateTime.now(),
-            updatedAt: DateTime.now(), // Added required field
-            isPinned: false,
-          );
-        }
-      }).toList();
+  // Get a specific summary by ID
+  Future<Summary?> getSummaryById(String summaryId) async {
+    try {
+      final doc = await firestore.collection('summaries').doc(summaryId).get();
+      return doc.exists ? Summary.fromFirestore(doc) : null;
     } catch (e) {
-      print('Error fetching user summaries: $e');
-      return [];
+      print('Error fetching summary: $e');
+      rethrow;
     }
   }
 
+  // Update an existing summary
   Future<void> updateSummary(Summary summary) async {
     try {
-      final summaryData = summary.toFirestore();
       await firestore
           .collection('summaries')
           .doc(summary.id)
-          .update(summaryData);
+          .update(summary.toFirestore());
     } catch (e) {
       print('Error updating summary: $e');
       rethrow;
     }
   }
 
+  // Delete a summary
   Future<void> deleteSummary(String summaryId) async {
     try {
       await firestore.collection('summaries').doc(summaryId).delete();
     } catch (e) {
-      print('Error deleting summary from Firestore: $e');
+      print('Error deleting summary: $e');
       rethrow;
     }
   }
 
   // Feedback operations
   Future<void> createFeedback(Feedback feedback) async {
-    await firestore.collection('feedback').add(feedback.toFirestore());
+    try {
+      // Add the feedback document to the 'feedback' collection
+      await firestore
+          .collection('feedback')
+          .doc(feedback.id)
+          .set(feedback.toFirestore());
+    } catch (e) {
+      print('Error creating feedback in Firestore: $e');
+      rethrow;
+    }
   }
 
   Future<List<Feedback>> getSummaryFeedback(String summaryId) async {
-    QuerySnapshot querySnapshot = await firestore
-        .collection('feedback')
-        .where('summaryId', isEqualTo: summaryId)
-        .get();
-    return querySnapshot.docs
-        .map((doc) => Feedback.fromFirestore(doc))
-        .toList();
+    try {
+      QuerySnapshot querySnapshot = await firestore
+          .collection('feedback')
+          .where('summaryId', isEqualTo: summaryId)
+          .orderBy('createdAt', descending: true)
+          .get();
+
+      return querySnapshot.docs
+          .map((doc) => Feedback.fromFirestore(doc))
+          .toList();
+    } catch (e) {
+      print('Error fetching summary feedback: $e');
+      return [];
+    }
+  }
+
+  Future<double> calculateAverageSummaryRating(String summaryId) async {
+    try {
+      QuerySnapshot querySnapshot = await firestore
+          .collection('feedback')
+          .where('summaryId', isEqualTo: summaryId)
+          .get();
+
+      // If no feedback exists, return 0
+      if (querySnapshot.docs.isEmpty) return 0.0;
+
+      // Calculate total rating
+      double totalRating = querySnapshot.docs
+          .map((doc) => (doc.data() as Map<String, dynamic>)['rating'] as num)
+          .reduce((a, b) => a + b)
+          .toDouble();
+
+      // Calculate average rating
+      double averageRating = totalRating / querySnapshot.docs.length;
+
+      // Round to 1 decimal place
+      return double.parse(averageRating.toStringAsFixed(1));
+    } catch (e) {
+      // Log the error and return 0 to prevent breaking the app
+      print('Error calculating average summary rating: $e');
+      return 0.0;
+    }
+  }
+
+  // Additional method to get feedback count for a summary
+  Future<int> getSummaryFeedbackCount(String summaryId) async {
+    try {
+      QuerySnapshot querySnapshot = await firestore
+          .collection('feedback')
+          .where('summaryId', isEqualTo: summaryId)
+          .get();
+
+      return querySnapshot.docs.length;
+    } catch (e) {
+      print('Error getting summary feedback count: $e');
+      return 0;
+    }
   }
 
   Future<void> updateFeedback(Feedback feedback) async {

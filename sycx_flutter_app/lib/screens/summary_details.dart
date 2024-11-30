@@ -1,7 +1,12 @@
-import 'package:animations/animations.dart';
+import 'dart:convert';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
+import 'package:animations/animations.dart';
+import 'package:flutter/services.dart';
 import 'package:fluttertoast/fluttertoast.dart';
+import 'package:intl/intl.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
 import 'package:sycx_flutter_app/screens/view_summary.dart';
 import 'package:sycx_flutter_app/utils/constants.dart';
 import 'package:sycx_flutter_app/widgets/animated_button.dart';
@@ -9,11 +14,20 @@ import 'package:sycx_flutter_app/widgets/custom_app_bar_mini.dart';
 import 'package:sycx_flutter_app/widgets/custom_bottom_nav_bar.dart';
 import 'package:sycx_flutter_app/widgets/custom_textarea.dart';
 import 'package:sycx_flutter_app/widgets/loading.dart';
+import 'package:sycx_flutter_app/services/database.dart';
+import 'package:sycx_flutter_app/models/feedback.dart' as app_feedback;
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:uuid/uuid.dart';
 
 class SummaryDetails extends StatefulWidget {
   final Map<String, dynamic> summary;
+  final String imageUrl;
 
-  const SummaryDetails({super.key, required this.summary});
+  const SummaryDetails({
+    super.key,
+    required this.summary,
+    required this.imageUrl,
+  });
 
   @override
   SummaryDetailsState createState() => SummaryDetailsState();
@@ -23,6 +37,7 @@ class SummaryDetailsState extends State<SummaryDetails> {
   double _rating = 0;
   final TextEditingController _reviewController = TextEditingController();
   bool _isLoading = false;
+  final Database _database = Database();
 
   @override
   Widget build(BuildContext context) {
@@ -39,8 +54,7 @@ class SummaryDetailsState extends State<SummaryDetails> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        _buildCardImage(
-                            widget.summary['image'] as String? ?? ''),
+                        _buildCardImage(widget.imageUrl),
                         Padding(
                           padding: const EdgeInsets.all(16.0),
                           child: Column(
@@ -54,7 +68,7 @@ class SummaryDetailsState extends State<SummaryDetails> {
                               ),
                               const SizedBox(height: 8),
                               Text(
-                                'Created on ${DateFormat('MMM d, yyyy').format(DateTime.parse(widget.summary['date'] as String? ?? DateTime.now().toIso8601String()))}',
+                                'Created on ${DateFormat('MMM d, yyyy').format(DateTime.parse(widget.summary['createdAt'] as String? ?? DateTime.now().toIso8601String()))}',
                                 style: AppTextStyles.bodyTextStyle.copyWith(
                                     color: AppColors.altPriTextColorDark),
                               ),
@@ -177,16 +191,55 @@ class SummaryDetailsState extends State<SummaryDetails> {
   }
 
   Future<void> _downloadSummary(BuildContext context) async {
-    setState(() => _isLoading = true);
     try {
-      // Simulate download process
-      await Future.delayed(const Duration(seconds: 2));
+      setState(() => _isLoading = true);
+
+      // Get the encoded content from the summary
+      String encodedSummaryContent = widget.summary['summaryContent'] ?? '';
+
+      if (encodedSummaryContent.isEmpty) {
+        throw Exception('No content available');
+      }
+
+      // Decode the encoded summary content
+      Uint8List pdfBytes = base64Decode(encodedSummaryContent);
+
+      // Create a PDF document from the decoded bytes
+      final pdf = pw.Document();
+      pdf.addPage(
+        pw.Page(
+          build: (pw.Context context) => pw.Center(
+            child: pw.Image(
+              pw.MemoryImage(pdfBytes),
+              fit: pw.BoxFit.contain,
+            ),
+          ),
+        ),
+      );
+
+      // Save and preview PDF
+      final fileName =
+          '${widget.summary['title']}_summary_${DateFormat('yyyyMMdd').format(DateTime.now())}.pdf';
+      final filePath = await Printing.sharePdf(
+        bytes: await pdf.save(),
+        filename: fileName,
+      );
+
       if (!mounted) return;
       Fluttertoast.showToast(
-        msg: "Summary downloaded",
-        toastLength: Toast.LENGTH_SHORT,
+        msg: "Summary downloaded to $filePath",
+        toastLength: Toast.LENGTH_LONG,
         gravity: ToastGravity.BOTTOM,
         backgroundColor: AppColors.gradientMiddle,
+        textColor: Colors.white,
+      );
+    } catch (e) {
+      if (!mounted) return;
+      Fluttertoast.showToast(
+        msg: "Download failed: ${e.toString()}",
+        toastLength: Toast.LENGTH_SHORT,
+        gravity: ToastGravity.BOTTOM,
+        backgroundColor: Colors.red,
         textColor: Colors.white,
       );
     } finally {
@@ -245,8 +298,9 @@ class SummaryDetailsState extends State<SummaryDetails> {
     if (confirmDelete == true) {
       setState(() => _isLoading = true);
       try {
-        // Simulate deletion process
-        await Future.delayed(const Duration(seconds: 2));
+        // Delete summary from Firestore
+        await _database.deleteSummary(widget.summary['id']);
+
         if (!mounted) return;
         Fluttertoast.showToast(
           msg: "Summary deleted",
@@ -255,7 +309,18 @@ class SummaryDetailsState extends State<SummaryDetails> {
           backgroundColor: AppColors.gradientMiddle,
           textColor: Colors.white,
         );
-        // Here you would typically navigate back or refresh the list
+
+        // Navigate back after deletion
+        Navigator.of(context).pop();
+      } catch (e) {
+        if (!mounted) return;
+        Fluttertoast.showToast(
+          msg: "Delete failed: ${e.toString()}",
+          toastLength: Toast.LENGTH_SHORT,
+          gravity: ToastGravity.BOTTOM,
+          backgroundColor: Colors.red,
+          textColor: Colors.white,
+        );
       } finally {
         if (mounted) setState(() => _isLoading = false);
       }
@@ -263,16 +328,72 @@ class SummaryDetailsState extends State<SummaryDetails> {
   }
 
   Future<void> _submitReview() async {
+    // Validate inputs
+    if (_rating == 0) {
+      Fluttertoast.showToast(
+        msg: "Please select a rating",
+        toastLength: Toast.LENGTH_SHORT,
+        gravity: ToastGravity.BOTTOM,
+        backgroundColor: Colors.red,
+        textColor: Colors.white,
+      );
+      return;
+    }
+
+    if (_reviewController.text.trim().isEmpty) {
+      Fluttertoast.showToast(
+        msg: "Please provide feedback",
+        toastLength: Toast.LENGTH_SHORT,
+        gravity: ToastGravity.BOTTOM,
+        backgroundColor: Colors.red,
+        textColor: Colors.white,
+      );
+      return;
+    }
+
     setState(() => _isLoading = true);
     try {
-      // TODO: Implement review submission logic
-      await Future.delayed(const Duration(seconds: 2)); // Simulate API call
+      // Get current user
+      final currentUser = FirebaseAuth.instance.currentUser;
+      if (currentUser == null) {
+        throw Exception('User not authenticated');
+      }
+
+      // Create feedback object
+      final feedback = app_feedback.Feedback(
+        id: const Uuid().v4(), // Generate a unique ID
+        userId: currentUser.uid,
+        summaryId: widget.summary['id'],
+        feedbackText: _reviewController.text.trim(),
+        rating: _rating,
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+      );
+
+      // Save feedback to Firestore
+      await _database.createFeedback(feedback);
+
       if (!mounted) return;
       Fluttertoast.showToast(
         msg: "Review submitted successfully",
         toastLength: Toast.LENGTH_SHORT,
         gravity: ToastGravity.BOTTOM,
         backgroundColor: AppColors.gradientMiddle,
+        textColor: Colors.white,
+      );
+
+      // Clear input fields
+      setState(() {
+        _rating = 0;
+        _reviewController.clear();
+      });
+    } catch (e) {
+      if (!mounted) return;
+      Fluttertoast.showToast(
+        msg: "Submit failed: ${e.toString()}",
+        toastLength: Toast.LENGTH_SHORT,
+        gravity: ToastGravity.BOTTOM,
+        backgroundColor: Colors.red,
         textColor: Colors.white,
       );
     } finally {

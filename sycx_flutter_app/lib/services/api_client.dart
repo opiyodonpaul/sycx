@@ -5,19 +5,22 @@ import 'package:sycx_flutter_app/utils/secure_storage.dart';
 class ApiClient {
   final http.Client httpClient;
   static const int maxChunkSize = 1024 * 1024; // 1MB chunks
+  final String baseUrl; // Add baseUrl as an instance variable
 
-  ApiClient({required this.httpClient});
+  // Update constructor to accept baseUrl with a default value from constants
+  ApiClient({required this.httpClient, String? baseUrl})
+      : baseUrl = baseUrl ?? Constants.baseUrl;
 
   Uri buildUri(String endpoint) {
     return Uri.parse('$baseUrl$endpoint');
   }
 
   Future<http.Response> post(
-      String endpoint, {
-        Map<String, String>? headers,
-        dynamic body,
-        bool authRequired = false,
-      }) async {
+    String endpoint, {
+    Map<String, String>? headers,
+    dynamic body,
+    bool authRequired = false,
+  }) async {
     final uri = buildUri(endpoint);
     final defaultHeaders = await _getHeaders(authRequired);
     if (headers != null) {
@@ -32,13 +35,13 @@ class ApiClient {
   }
 
   Future<http.StreamedResponse> postMultipart(
-      String endpoint, {
-        required Map<String, String> fields,
-        required Map<String, String> files,
-        Map<String, String>? headers,
-        bool authRequired = false,
-        Function(double)? onProgress,
-      }) async {
+    String endpoint, {
+    required Map<String, String> fields,
+    required Map<String, String> files,
+    Map<String, String>? headers,
+    bool authRequired = false,
+    Function(double)? onProgress,
+  }) async {
     final uri = buildUri(endpoint);
     final request = http.MultipartRequest('POST', uri);
 
@@ -85,10 +88,10 @@ class ApiClient {
   }
 
   Future<http.Response> get(
-      String endpoint, {
-        Map<String, String>? headers,
-        bool authRequired = false,
-      }) async {
+    String endpoint, {
+    Map<String, String>? headers,
+    bool authRequired = false,
+  }) async {
     final uri = buildUri(endpoint);
     final defaultHeaders = await _getHeaders(authRequired);
     if (headers != null) {
@@ -105,11 +108,11 @@ class ApiClient {
   }
 
   Future<http.Response> put(
-      String endpoint, {
-        Map<String, String>? headers,
-        dynamic body,
-        bool authRequired = false,
-      }) async {
+    String endpoint, {
+    Map<String, String>? headers,
+    dynamic body,
+    bool authRequired = false,
+  }) async {
     final uri = buildUri(endpoint);
     final defaultHeaders = await _getHeaders(authRequired);
     if (headers != null) {
@@ -127,10 +130,10 @@ class ApiClient {
   }
 
   Future<http.Response> delete(
-      String endpoint, {
-        Map<String, String>? headers,
-        bool authRequired = false,
-      }) async {
+    String endpoint, {
+    Map<String, String>? headers,
+    bool authRequired = false,
+  }) async {
     final uri = buildUri(endpoint);
     final defaultHeaders = await _getHeaders(authRequired);
     if (headers != null) {
@@ -146,7 +149,8 @@ class ApiClient {
     return response;
   }
 
-  Future<http.Response> getStreamedResponse(http.StreamedResponse streamedResponse) async {
+  Future<http.Response> getStreamedResponse(
+      http.StreamedResponse streamedResponse) async {
     return await http.Response.fromStream(streamedResponse);
   }
 

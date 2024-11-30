@@ -1,9 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-const String baseUrl = 'http://10.0.2.2:5000';
-// const String baseUrl = 'https://sycx.onrender.com';
-const String accessKey = 'es3EmOY-JpODxTpk51-VgMkrGeZwGZKE8xKDqW_Bdkk';
+// Create a constants class to encapsulate constants
+class Constants {
+  static const String baseUrl = 'http://10.0.2.2:5000';
+  // static const String baseUrl = 'https://sycx.onrender.com';
+  static const String accessKey = 'es3EmOY-JpODxTpk51-VgMkrGeZwGZKE8xKDqW_Bdkk';
+}
+
+// Create an instance for easier access
+final constants = Constants();
 
 class AppColors {
   static const Color gradientStart = Color(0xFF6A11CB);

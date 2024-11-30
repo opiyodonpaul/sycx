@@ -1,13 +1,14 @@
 import 'dart:ui';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:animations/animations.dart';
 import 'package:intl/intl.dart';
+import 'package:sycx_flutter_app/models/summary.dart';
 import 'package:sycx_flutter_app/utils/constants.dart';
 import 'package:sycx_flutter_app/screens/summary_details.dart';
+import 'package:sycx_flutter_app/services/unsplash.dart';
 
-class SummaryCard extends StatelessWidget {
-  final Map<String, dynamic> summary;
+class SummaryCard extends StatefulWidget {
+  final Summary summary;
   final Function(String) onTogglePin;
   final bool isEmpty;
 
@@ -18,41 +19,66 @@ class SummaryCard extends StatelessWidget {
     this.isEmpty = false,
   });
 
-  String _getCardTitle() {
-    if (isEmpty) return 'Create Summary';
+  @override
+  State<SummaryCard> createState() => SummaryCardState();
+}
 
-    return summary['title']?.toString() ??
-        (summary['originalDocuments'] as List?)
-            ?.firstOrNull?['title']
-            ?.toString() ??
-        'Untitled';
+class SummaryCardState extends State<SummaryCard> {
+  String? _imageUrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchImageUrl();
   }
 
+  Future<void> _fetchImageUrl() async {
+    if (!widget.isEmpty) {
+      final title = _getCardTitle();
+      _imageUrl = await Unsplash.getRandomImageUrl(title);
+      setState(() {});
+    }
+  }
+
+  /// Determine the card's display title
+  String _getCardTitle() {
+    // Handle empty card state
+    if (widget.isEmpty) return 'Create Summary';
+
+    // Prioritize title from the summary model
+    return widget.summary.title ??
+        (widget.summary.originalDocuments.isNotEmpty
+            ? widget.summary.originalDocuments.first.title
+            : 'Untitled');
+  }
+
+  /// Format the creation date for display
   String _getFormattedDate() {
     try {
-      final createdAt = summary['date'] ?? summary['createdAt'];
-      if (createdAt != null) {
-        final DateTime date = DateTime.parse(createdAt.toString());
-        return DateFormat('MMM d, yyyy').format(date);
-      }
+      return DateFormat('MMM d, yyyy').format(widget.summary.createdAt);
     } catch (e) {
       print('Error formatting date: $e');
+      return 'Date not available';
     }
-    return 'Date not available';
   }
 
   @override
   Widget build(BuildContext context) {
-    if (isEmpty) {
+    // Empty state card (create new summary)
+    if (widget.isEmpty) {
       return GestureDetector(
         onTap: () => Navigator.of(context).pushReplacementNamed('/upload'),
         child: _buildCardContent(context),
       );
     }
 
+    // Regular summary card with detail view navigation
     return OpenContainer(
       transitionDuration: const Duration(milliseconds: 500),
-      openBuilder: (context, _) => SummaryDetails(summary: summary),
+      openBuilder: (context, _) => SummaryDetails(
+        summary: widget.summary.toCardFormat(), // Use toCardFormat() method
+        imageUrl: _imageUrl ?? '',
+      ),
       closedBuilder: (context, openContainer) => GestureDetector(
         onTap: openContainer,
         child: _buildCardContent(context),
@@ -60,6 +86,7 @@ class SummaryCard extends StatelessWidget {
     );
   }
 
+  /// Build the main card content
   Widget _buildCardContent(BuildContext context) {
     final cardTitle = _getCardTitle();
     final dateStr = _getFormattedDate();
@@ -89,7 +116,8 @@ class SummaryCard extends StatelessWidget {
             ),
           ),
         ),
-        if (!isEmpty) _buildPinButton(),
+        // Pin button only for non-empty cards
+        if (!widget.isEmpty) _buildPinButton(),
       ],
     );
   }
@@ -132,7 +160,9 @@ class SummaryCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  isEmpty ? 'Create your first summary!' : 'Created on $date',
+                  widget.isEmpty
+                      ? 'Create your first summary!'
+                      : 'Created on $date',
                   style: AppTextStyles.bodyTextStyle.copyWith(
                     color: AppColors.secondaryTextColor,
                   ),
@@ -150,17 +180,17 @@ class SummaryCard extends StatelessWidget {
       top: 8,
       right: 8,
       child: GestureDetector(
-        onTap: () => onTogglePin(summary['id']?.toString() ?? ''),
+        onTap: () => widget.onTogglePin(widget.summary.id),
         child: AnimatedSwitcher(
           duration: const Duration(milliseconds: 300),
           transitionBuilder: (Widget child, Animation<double> animation) {
             return ScaleTransition(scale: animation, child: child);
           },
           child: Icon(
-            summary['isPinned'] == true
+            widget.summary.isPinned
                 ? Icons.push_pin
                 : Icons.push_pin_outlined,
-            key: ValueKey<bool>(summary['isPinned'] == true),
+            key: ValueKey<bool>(widget.summary.isPinned),
             color: AppColors.primaryButtonColor,
           ),
         ),
@@ -169,11 +199,9 @@ class SummaryCard extends StatelessWidget {
   }
 
   Widget _buildCardImage() {
-    final imageUrl = summary['imageUrl'];
-
-    if (imageUrl != null && imageUrl.isNotEmpty) {
+    if (_imageUrl != null) {
       return Image.network(
-        imageUrl,
+        _imageUrl!,
         fit: BoxFit.cover,
         errorBuilder: (context, error, stackTrace) => _buildFallbackImage(),
         loadingBuilder: (context, child, loadingProgress) {
