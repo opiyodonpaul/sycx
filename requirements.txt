@@ -20,3 +20,10 @@ gunicorn
 accelerate
 werkzeug
 psutil
+gevent
+futures
+python-json-logger
+requests
+python-multipart
+six
+spacy

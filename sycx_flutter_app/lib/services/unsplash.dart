@@ -10,7 +10,7 @@ class Unsplash {
       final response = await http.get(
         Uri.parse(
             '$_baseUrl/photos/random?query=${Uri.encodeComponent(query)}&orientation=landscape'),
-        headers: {'Authorization': 'Client-ID $accessKey'},
+        headers: {'Authorization': 'Client-ID $Constants.accessKey'},
       );
 
       if (response.statusCode == 200) {

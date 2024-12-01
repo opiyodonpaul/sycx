@@ -92,13 +92,14 @@ class UploadState extends State<Upload> with TickerProviderStateMixin {
   }
 
   Future<void> pickFiles() async {
-    final result = await FilePicker.platform.pickFiles(
-      allowMultiple: true,
+    FilePickerResult? result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
+      allowMultiple: false,
       allowedExtensions: [
         'pdf',
         'doc',
         'docx',
+        'txt',
         'xls',
         'xlsx',
         'ppt',
@@ -106,28 +107,25 @@ class UploadState extends State<Upload> with TickerProviderStateMixin {
         'jpg',
         'jpeg',
         'png',
-        'gif',
-        'bmp',
-        'txt'
+        'gif'
       ],
     );
 
     if (result != null) {
-      int totalSize = result.files.fold(0, (sum, file) => sum + (file.size));
-      if (totalSize > maxFileSize) {
-        Fluttertoast.showToast(
-          msg:
-              "Total file size exceeds 1GB limit. Please reduce the size or number of files.",
-          toastLength: Toast.LENGTH_LONG,
-          gravity: ToastGravity.BOTTOM,
-          backgroundColor: AppColors.gradientMiddle,
-          textColor: Colors.white,
-        );
-        return;
-      }
+      // Validate file sizes before adding to uploadedFiles
+      final validFiles = result.files.where((file) {
+        if (file.size > maxFileSize) {
+          Fluttertoast.showToast(
+            msg: "File ${file.name} exceeds 1GB limit",
+            toastLength: Toast.LENGTH_LONG,
+          );
+          return false;
+        }
+        return true;
+      }).toList();
 
       setState(() {
-        uploadedFiles.addAll(result.files);
+        uploadedFiles = validFiles;
       });
     }
   }
@@ -148,11 +146,13 @@ class UploadState extends State<Upload> with TickerProviderStateMixin {
   }
 
   Future<void> summarize() async {
+    // Validate file upload
     if (uploadedFiles.isEmpty) {
       Fluttertoast.showToast(msg: "Please upload at least one file");
       return;
     }
 
+    // Validate user authentication
     if (currentUserId == null) {
       Fluttertoast.showToast(msg: "User not authenticated");
       return;
@@ -164,32 +164,24 @@ class UploadState extends State<Upload> with TickerProviderStateMixin {
     _loadingAnimationController.forward();
 
     try {
-      List<Map<String, dynamic>> documents = [];
-      for (var file in uploadedFiles) {
-        try {
-          final base64Content = await encodeFileToBase64(file);
-          documents.add({
-            'name': file.name,
-            'content': base64Content,
-            'type': file.extension ?? '',
-          });
-        } catch (e) {
-          throw Exception('Error processing file ${file.name}: $e');
-        }
-      }
+      // Convert PlatformFile to File for API upload
+      final fileInputs =
+          await Future.wait(uploadedFiles.map((platformFile) async {
+        final file = File(platformFile.path!);
+        return file;
+      }));
 
       final summaries = await SummaryService.summarizeDocuments(
-        documents,
-        summaryDepth,
-        _selectedLanguage,
-        currentUserId!,
+        files: fileInputs,
+        summaryDepth: summaryDepth,
+        language: _selectedLanguage,
+        userId: currentUserId!,
       );
 
       setState(() {
         isLoading = false;
       });
       _loadingAnimationController.reverse();
-
       if (mounted) {
         Navigator.pushNamed(context, '/summaries', arguments: summaries);
       }

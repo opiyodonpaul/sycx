@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
 import 'package:fluttertoast/fluttertoast.dart';
@@ -28,6 +29,7 @@ class SummariesState extends State<Summaries>
   late AnimationController _animationController;
 
   List<Summary> _summaries = [];
+  List<Summary> _pinnedSummaries = [];
   List<String> _searches = [];
   bool _isLoading = true;
   final TextEditingController _searchController = TextEditingController();
@@ -52,13 +54,27 @@ class SummariesState extends State<Summaries>
   Future<void> _loadData() async {
     try {
       // Get current user ID
-      final firebaseUser = firebase_auth.FirebaseAuth.instance.currentUser;
+      final firebaseUser = FirebaseAuth.instance.currentUser;
       if (firebaseUser != null) {
         // Fetch user data
         final user = await _database.getUser(firebaseUser.uid);
 
-        // Fetch all user summaries
-        final summaries = await _database.getUserSummaries(firebaseUser.uid);
+        // Set up a stream listener for user summaries
+        _database.getUserSummaries(firebaseUser.uid).listen((summariesList) {
+          if (mounted) {
+            setState(() {
+              // Sort non-pinned summaries by createdAt in descending order and take the latest 4
+              _summaries =
+                  summariesList.where((summary) => !summary.isPinned).toList()
+                    ..sort((a, b) => b.createdAt.compareTo(a.createdAt))
+                    ..take(4);
+
+              // Separate pinned summaries
+              _pinnedSummaries =
+                  summariesList.where((summary) => summary.isPinned).toList();
+            });
+          }
+        });
 
         // Fetch recent searches
         final searches = await _fetchRecentSearches(firebaseUser.uid);
@@ -66,11 +82,10 @@ class SummariesState extends State<Summaries>
         if (mounted) {
           setState(() {
             _currentUser = user;
-            _summaries = summaries.reversed.toList();
             _searches = searches;
             _isLoading = false;
+            _animationController.forward();
           });
-          _animationController.forward();
         }
       }
     } catch (e) {
@@ -304,6 +319,46 @@ class SummariesState extends State<Summaries>
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // First show pinned summaries
+            if (_pinnedSummaries.isNotEmpty) ...[
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                child: Text('Pinned Summaries',
+                    style: AppTextStyles.titleStyle.copyWith(fontSize: 18)),
+              ),
+              const SizedBox(height: 8),
+              GridView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 2,
+                  childAspectRatio: 0.8,
+                  crossAxisSpacing: 16,
+                  mainAxisSpacing: 16,
+                ),
+                itemCount: _pinnedSummaries.length,
+                itemBuilder: (context, index) {
+                  return AnimationConfiguration.staggeredGrid(
+                    position: index,
+                    duration: const Duration(milliseconds: 375),
+                    columnCount: 2,
+                    child: ScaleAnimation(
+                      child: FadeInAnimation(
+                        child: SummaryCard(
+                          summary: _pinnedSummaries[index],
+                          onTogglePin: _togglePin,
+                          isEmpty: false,
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+              const SizedBox(height: 16),
+            ],
+
+            // Then show all summaries
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 24),
               child: Text('All Summaries',
@@ -330,32 +385,19 @@ class SummariesState extends State<Summaries>
                     child: FadeInAnimation(
                       child: _summaries.isEmpty
                           ? SummaryCard(
-                              summary: {
-                                'id': 'empty',
-                                'title': 'No summaries yet',
-                                'date': DateTime.now().toIso8601String(),
-                                'image': 'assets/images/card.png',
-                                'isPinned': false,
-                              },
+                              summary: Summary(
+                                // Create an empty Summary
+                                userId: '',
+                                originalDocuments: [],
+                                summaryContent: '',
+                                createdAt: DateTime.now(),
+                                updatedAt: DateTime.now(),
+                              ),
                               onTogglePin: (_) {},
                               isEmpty: true,
                             )
                           : SummaryCard(
-                              summary: {
-                                'id': _summaries[index].id,
-                                'title': _summaries[index]
-                                        .originalDocuments
-                                        .isNotEmpty
-                                    ? _summaries[index]
-                                        .originalDocuments
-                                        .first
-                                        .title
-                                    : 'Untitled Summary',
-                                'date': _summaries[index]
-                                    .createdAt
-                                    .toIso8601String(),
-                                'isPinned': _summaries[index].isPinned,
-                              },
+                              summary: _summaries[index],
                               onTogglePin: _togglePin,
                               isEmpty: false,
                             ),

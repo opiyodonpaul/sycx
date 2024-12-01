@@ -1,10 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
+
+import 'package:sycx_flutter_app/models/summary.dart';
+import 'package:sycx_flutter_app/services/database.dart';
 import 'package:sycx_flutter_app/utils/constants.dart';
 import 'package:sycx_flutter_app/widgets/custom_app_bar_mini.dart';
 import 'package:sycx_flutter_app/widgets/custom_bottom_nav_bar.dart';
 import 'package:sycx_flutter_app/widgets/loading.dart';
 import 'package:sycx_flutter_app/widgets/summary_card.dart';
-import 'package:sycx_flutter_app/dummy_data.dart';
 
 class SearchResults extends StatefulWidget {
   final String searchQuery;
@@ -16,8 +21,9 @@ class SearchResults extends StatefulWidget {
 }
 
 class SearchResultsState extends State<SearchResults> {
-  late List<Map<String, dynamic>> searchResults;
-  bool _isLoading = false;
+  final Database _database = Database();
+  List<Summary> _searchResults = [];
+  bool _isLoading = true;
 
   @override
   void initState() {
@@ -25,17 +31,77 @@ class SearchResultsState extends State<SearchResults> {
     _performSearch();
   }
 
-  void _performSearch() {
-    setState(() => _isLoading = true);
+  Future<void> _performSearch() async {
+    try {
+      // Get current user
+      final firebaseUser = FirebaseAuth.instance.currentUser;
+      if (firebaseUser == null) {
+        setState(() {
+          _isLoading = false;
+          _searchResults = [];
+        });
+        return;
+      }
 
-    // Filter summaries based on the search query
-    searchResults = DummyData.summaries.where((summary) {
-      final title = summary['title'].toString().toLowerCase();
-      final query = widget.searchQuery.toLowerCase();
-      return title.contains(query);
-    }).toList();
+      // Fetch all user's summaries
+      QuerySnapshot querySnapshot = await _database.firestore
+          .collection('summaries')
+          .where('userId', isEqualTo: firebaseUser.uid)
+          .get();
 
-    setState(() => _isLoading = false);
+      // Filter results client-side for case-insensitive partial matching
+      List<Summary> results = querySnapshot.docs
+          .map((doc) => Summary.fromFirestore(doc))
+          .where((summary) {
+        // Check if search query matches title or summary content
+        final lowercaseQuery = widget.searchQuery.toLowerCase();
+        return summary.title!.toLowerCase().contains(lowercaseQuery) ||
+            summary.summaryContent.toLowerCase().contains(lowercaseQuery);
+      }).toList();
+
+      if (mounted) {
+        setState(() {
+          _searchResults = results;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      print('Error performing search: $e');
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _searchResults = [];
+        });
+      }
+    }
+  }
+
+  void _togglePin(String id) async {
+    try {
+      // Find the summary in the list
+      Summary? summaryToToggle =
+          _searchResults.firstWhere((summary) => summary.id == id);
+
+      // Get the current user
+      final firebaseUser = FirebaseAuth.instance.currentUser;
+      if (firebaseUser == null) return;
+
+      // Toggle the pinned status
+      summaryToToggle.isPinned = !summaryToToggle.isPinned;
+
+      // Update in the database
+      await _database.updateSummary(summaryToToggle);
+
+      // Update the local list
+      setState(() {
+        int index = _searchResults.indexWhere((summary) => summary.id == id);
+        if (index != -1) {
+          _searchResults[index] = summaryToToggle;
+        }
+      });
+    } catch (e) {
+      print('Error toggling pin: $e');
+    }
   }
 
   @override
@@ -45,30 +111,26 @@ class SearchResultsState extends State<SearchResults> {
         : Scaffold(
             appBar: CustomAppBarMini(
                 title: 'Search Results: ${widget.searchQuery}'),
-            body: Stack(
-              children: [
-                RefreshIndicator(
-                  onRefresh: _handleRefresh,
-                  child: SingleChildScrollView(
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    child: Padding(
-                      padding: const EdgeInsets.all(16.0),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Results for "${widget.searchQuery}"',
-                            style: AppTextStyles.titleStyle,
-                          ),
-                          const SizedBox(height: 16),
-                          _buildSearchResults(),
-                          const SizedBox(height: 5),
-                        ],
+            body: RefreshIndicator(
+              onRefresh: _handleRefresh,
+              child: SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                child: Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Results for "${widget.searchQuery}"',
+                        style: AppTextStyles.titleStyle,
                       ),
-                    ),
+                      const SizedBox(height: 16),
+                      _buildSearchResults(),
+                      const SizedBox(height: 5),
+                    ],
                   ),
                 ),
-              ],
+              ),
             ),
             bottomNavigationBar: const CustomBottomNavBar(
               currentRoute: '/search',
@@ -77,7 +139,7 @@ class SearchResultsState extends State<SearchResults> {
   }
 
   Widget _buildSearchResults() {
-    if (searchResults.isEmpty) {
+    if (_searchResults.isEmpty) {
       return Container(
         padding: const EdgeInsets.all(defaultPadding),
         decoration: BoxDecoration(
@@ -130,24 +192,32 @@ class SearchResultsState extends State<SearchResults> {
       physics: const NeverScrollableScrollPhysics(),
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 2,
+        childAspectRatio: 0.8,
         crossAxisSpacing: 16,
         mainAxisSpacing: 16,
-        childAspectRatio: 0.75,
       ),
-      itemCount: searchResults.length,
+      itemCount: _searchResults.length,
       itemBuilder: (context, index) {
-        return SummaryCard(
-          summary: searchResults[index],
-          onTogglePin: (_) {}, // Empty function as pinning is not used here
-          isEmpty: false,
+        return AnimationConfiguration.staggeredGrid(
+          position: index,
+          duration: const Duration(milliseconds: 375),
+          columnCount: 2,
+          child: ScaleAnimation(
+            child: FadeInAnimation(
+              child: SummaryCard(
+                summary: _searchResults[index],
+                onTogglePin: _togglePin,
+                isEmpty: false,
+              ),
+            ),
+          ),
         );
       },
     );
   }
 
   Future<void> _handleRefresh() async {
-    setState(() => _isLoading = true);
-    await Future.delayed(const Duration(seconds: 1)); // Simulate delay
-    _performSearch();
+    CustomBottomNavBar.updateLastMainRoute('/search');
+    await _performSearch();
   }
 }

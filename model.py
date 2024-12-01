@@ -17,7 +17,7 @@ from contextlib import contextmanager
 # Load environment variables
 load_dotenv()
 HUGGINGFACE_API_KEY = os.getenv('HUGGINGFACE_API_KEY')
-MAX_MEMORY_MB = int(os.getenv('MAX_MEMORY_MB', '512'))
+MAX_MEMORY_MB = int(os.getenv('MAX_MEMORY_MB', str(int(1.2 * 1024))))
 
 # Create logs directory if it doesn't exist
 os.makedirs('logs', exist_ok=True)
@@ -196,65 +196,66 @@ class SummarizationModel:
             return 100, 30  # Default fallback values
 
     def generate_summary(self, text: str, summary_depth: float = 0.3, timeout: int = 30) -> Optional[str]:
-        """Generate a summary with enhanced error handling and timeout protection."""
+        """Generate a summary with robust error handling."""
         try:
-            start_time = time.time()
-            with self.lock:
-                # Add input validation
-                if not text or not isinstance(text, str):
-                    return "Invalid input text"
+            # Validate input
+            if not text or not isinstance(text, str):
+                return "Invalid input text"
+            
+            # Preprocess text
+            cleaned_text = self.preprocess_text(text)
+            if not cleaned_text:
+                return "Empty text after preprocessing"
+            
+            # Tokenize and truncate input
+            try:
+                input_tokens = self.tokenizer.encode(
+                    cleaned_text, 
+                    truncation=True, 
+                    max_length=1024, 
+                    return_tensors="pt"
+                )
+            except Exception as e:
+                logging.error(f"Tokenization error: {str(e)}")
+                return "Error in text preprocessing"
+            
+            # Compute summary length parameters
+            try:
+                max_length, min_length = self.optimize_length_params(cleaned_text, summary_depth)
+            except Exception as e:
+                logging.error(f"Length parameter error: {str(e)}")
+                max_length, min_length = 100, 30
+            
+            # Safe summarization with error handling
+            try:
+                # Move input to same device as model
+                input_tokens = input_tokens.to(self.device)
                 
-                cleaned_text = self.preprocess_text(text)
-                if not cleaned_text:
-                    return "Input text is empty after preprocessing."
-                    
-                word_count = len(cleaned_text.split())
-                if word_count < self.min_chunk_size:
-                    return cleaned_text
-
-                # Add try-except for parameter optimization
-                try:
-                    max_length, min_length = self.optimize_length_params(cleaned_text, summary_depth)
-                except Exception as e:
-                    logging.error(f"Error optimizing length parameters: {str(e)}")
-                    max_length, min_length = 100, 30  # Default fallback values
-
-                # Add timeout check before summary generation
-                if time.time() - start_time > timeout:
-                    return cleaned_text[:1024]  # Return truncated text if timeout occurred
-
-                try:
-                    summary = self.summarizer(
-                        cleaned_text,
-                        max_length=max_length,
-                        min_length=min_length,
-                        do_sample=True,
-                        num_beams=2,
-                        temperature=0.7,
-                        top_k=50,
-                        top_p=0.95,
-                        early_stopping=True,
-                        no_repeat_ngram_size=3,
-                        batch_size=self.batch_size
-                    )
-                    
-                    # Validate summary output
-                    if not summary or not isinstance(summary, list) or len(summary) == 0:
-                        return "Error: Empty summary generated"
-                    
-                    result = summary[0].get('summary_text', '').strip()
-                    if not result:
-                        return "Error: Empty summary text"
-                        
-                    return re.sub(r'\s+', ' ', result).replace(' .', '.').replace(' ,', ',')
-                    
-                except Exception as e:
-                    logging.error(f"Error in summarizer pipeline: {str(e)}")
-                    return f"Error generating summary: {str(e)}"
-                    
+                # Generate summary with defensive programming
+                summary_ids = self.model.generate(
+                    input_tokens,
+                    max_length=max_length,
+                    min_length=min_length,
+                    num_beams=4,
+                    no_repeat_ngram_size=2,
+                    early_stopping=True
+                )
+                
+                # Decode summary safely
+                summary = self.tokenizer.decode(
+                    summary_ids[0], 
+                    skip_special_tokens=True
+                ).strip()
+                
+                return summary if summary else "No summary generated"
+            
+            except Exception as e:
+                logging.error(f"Summarization generation error: {str(e)}")
+                return f"Summarization error: {str(e)}"
+        
         except Exception as e:
-            logging.error(f"Error in generate_summary: {str(e)}")
-            return f"Error generating summary: {str(e)}"
+            logging.error(f"Unexpected summary generation error: {str(e)}")
+            return "Unable to generate summary"
 
     def chunk_text(self, text: str) -> List[str]:
         """Improved text chunking with sentence boundary preservation."""

@@ -69,6 +69,7 @@ class MyApp extends StatelessWidget {
         '/search': (context) => const SearchResults(searchQuery: ''),
         '/summary_details': (context) => const SummaryDetails(
               summary: {},
+              imageUrl: '',
             ),
         '/view_summary': (context) => const ViewSummary(
               summary: {},
