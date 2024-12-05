@@ -1,12 +1,11 @@
-import 'dart:convert';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:animations/animations.dart';
-import 'package:flutter/services.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:intl/intl.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
+import 'package:sycx_flutter_app/models/summary.dart';
 import 'package:sycx_flutter_app/screens/view_summary.dart';
 import 'package:sycx_flutter_app/utils/constants.dart';
 import 'package:sycx_flutter_app/widgets/animated_button.dart';
@@ -20,7 +19,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:uuid/uuid.dart';
 
 class SummaryDetails extends StatefulWidget {
-  final Map<String, dynamic> summary;
+  final Summary summary;
   final String imageUrl;
 
   const SummaryDetails({
@@ -47,7 +46,7 @@ class SummaryDetailsState extends State<SummaryDetails> {
             children: [
               Scaffold(
                 appBar: CustomAppBarMini(
-                    title: widget.summary['title'] ?? 'Summary Details'),
+                    title: widget.summary.title ?? 'Summary Details'),
                 body: RefreshIndicator(
                   onRefresh: _handleRefresh,
                   child: SingleChildScrollView(
@@ -61,16 +60,17 @@ class SummaryDetailsState extends State<SummaryDetails> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                widget.summary['title'] ?? 'Untitled Summary',
+                                widget.summary.title ?? 'Untitled Summary',
                                 style: AppTextStyles.headingStyleNoShadow
                                     .copyWith(
                                         color: AppColors.primaryTextColorDark),
                               ),
                               const SizedBox(height: 8),
                               Text(
-                                'Created on ${DateFormat('MMM d, yyyy').format(DateTime.parse(widget.summary['createdAt'] as String? ?? DateTime.now().toIso8601String()))}',
+                                'Created on ${DateFormat('MMM d, yyyy').format(widget.summary.createdAt)}',
                                 style: AppTextStyles.bodyTextStyle.copyWith(
-                                    color: AppColors.altPriTextColorDark),
+                                  color: AppColors.altPriTextColorDark,
+                                ),
                               ),
                               const SizedBox(height: 24),
                               Text(
@@ -162,6 +162,7 @@ class SummaryDetailsState extends State<SummaryDetails> {
           );
   }
 
+  // Replace the existing _buildCardImage method
   Widget _buildCardImage(String imageUrl) {
     return Image.network(
       imageUrl,
@@ -194,34 +195,15 @@ class SummaryDetailsState extends State<SummaryDetails> {
     try {
       setState(() => _isLoading = true);
 
-      // Get the encoded content from the summary
-      String encodedSummaryContent = widget.summary['summaryContent'] ?? '';
-
-      if (encodedSummaryContent.isEmpty) {
-        throw Exception('No content available');
-      }
-
-      // Decode the encoded summary content
-      Uint8List pdfBytes = base64Decode(encodedSummaryContent);
-
-      // Create a PDF document from the decoded bytes
-      final pdf = pw.Document();
-      pdf.addPage(
-        pw.Page(
-          build: (pw.Context context) => pw.Center(
-            child: pw.Image(
-              pw.MemoryImage(pdfBytes),
-              fit: pw.BoxFit.contain,
-            ),
-          ),
-        ),
-      );
+      // Get the summary content
+      final decodedSummaryContent =
+          await getSummaryAsPdf(widget.summary.summaryContent);
 
       // Save and preview PDF
       final fileName =
-          '${widget.summary['title']}_summary_${DateFormat('yyyyMMdd').format(DateTime.now())}.pdf';
+          '${widget.summary.title}_summary_${DateFormat('yyyyMMdd').format(DateTime.now())}.pdf';
       final filePath = await Printing.sharePdf(
-        bytes: await pdf.save(),
+        bytes: decodedSummaryContent,
         filename: fileName,
       );
 
@@ -245,6 +227,24 @@ class SummaryDetailsState extends State<SummaryDetails> {
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
+  }
+
+  Future<Uint8List> getSummaryAsPdf(String summaryContent) async {
+    final pdf = pw.Document();
+
+    pdf.addPage(
+      pw.Page(
+        build: (pw.Context context) => pw.Text(
+          summaryContent,
+          style: const pw.TextStyle(
+            fontSize: 12,
+          ),
+        ),
+      ),
+    );
+
+    // Return PDF as Uint8List
+    return pdf.save();
   }
 
   Future<void> _deleteSummary(BuildContext context) async {
@@ -299,7 +299,7 @@ class SummaryDetailsState extends State<SummaryDetails> {
       setState(() => _isLoading = true);
       try {
         // Delete summary from Firestore
-        await _database.deleteSummary(widget.summary['id']);
+        await _database.deleteSummary(widget.summary.id);
 
         if (!mounted) return;
         Fluttertoast.showToast(
@@ -363,7 +363,7 @@ class SummaryDetailsState extends State<SummaryDetails> {
       final feedback = app_feedback.Feedback(
         id: const Uuid().v4(), // Generate a unique ID
         userId: currentUser.uid,
-        summaryId: widget.summary['id'],
+        summaryId: widget.summary.id,
         feedbackText: _reviewController.text.trim(),
         rating: _rating,
         createdAt: DateTime.now(),

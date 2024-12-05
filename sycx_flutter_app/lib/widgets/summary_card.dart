@@ -20,23 +20,31 @@ class SummaryCard extends StatefulWidget {
   });
 
   @override
-  State<SummaryCard> createState() => SummaryCardState();
+  State<SummaryCard> createState() => _SummaryCardState();
 }
 
-class SummaryCardState extends State<SummaryCard> {
+class _SummaryCardState extends State<SummaryCard> {
   String? _imageUrl;
 
   @override
   void initState() {
     super.initState();
-    _fetchImageUrl();
+    // Only fetch image for non-empty cards
+    if (!widget.isEmpty) {
+      _fetchImageUrl();
+    }
   }
 
   Future<void> _fetchImageUrl() async {
-    if (!widget.isEmpty) {
-      final title = _getCardTitle();
-      _imageUrl = await Unsplash.getRandomImageUrl(title);
-      setState(() {});
+    final title = _getCardTitle();
+    // Attempt to fetch image URL
+    final fetchedImageUrl = await Unsplash.getRandomImageUrl(title);
+
+    // Update state only if mounted and image URL is found
+    if (mounted) {
+      setState(() {
+        _imageUrl = fetchedImageUrl;
+      });
     }
   }
 
@@ -76,7 +84,7 @@ class SummaryCardState extends State<SummaryCard> {
     return OpenContainer(
       transitionDuration: const Duration(milliseconds: 500),
       openBuilder: (context, _) => SummaryDetails(
-        summary: widget.summary.toCardFormat(), // Use toCardFormat() method
+        summary: widget.summary,
         imageUrl: _imageUrl ?? '',
       ),
       closedBuilder: (context, openContainer) => GestureDetector(
@@ -109,7 +117,7 @@ class SummaryCardState extends State<SummaryCard> {
             child: Stack(
               fit: StackFit.expand,
               children: [
-                _buildCardImage(),
+                _buildCardImage(cardTitle),
                 _buildGradientOverlay(),
                 _buildCardInfo(cardTitle, dateStr),
               ],
@@ -187,9 +195,7 @@ class SummaryCardState extends State<SummaryCard> {
             return ScaleTransition(scale: animation, child: child);
           },
           child: Icon(
-            widget.summary.isPinned
-                ? Icons.push_pin
-                : Icons.push_pin_outlined,
+            widget.summary.isPinned ? Icons.push_pin : Icons.push_pin_outlined,
             key: ValueKey<bool>(widget.summary.isPinned),
             color: AppColors.primaryButtonColor,
           ),
@@ -198,12 +204,13 @@ class SummaryCardState extends State<SummaryCard> {
     );
   }
 
-  Widget _buildCardImage() {
+  Widget _buildCardImage(String title) {
     if (_imageUrl != null) {
       return Image.network(
         _imageUrl!,
         fit: BoxFit.cover,
-        errorBuilder: (context, error, stackTrace) => _buildFallbackImage(),
+        errorBuilder: (context, error, stackTrace) =>
+            _buildFallbackImage(title),
         loadingBuilder: (context, child, loadingProgress) {
           if (loadingProgress == null) return child;
           return _buildLoadingIndicator();
@@ -211,10 +218,10 @@ class SummaryCardState extends State<SummaryCard> {
       );
     }
 
-    return _buildFallbackImage();
+    return _buildFallbackImage(title);
   }
 
-  Widget _buildFallbackImage() {
+  Widget _buildFallbackImage(String title) {
     return Container(
       color: Colors.grey[300],
       child: const Center(
