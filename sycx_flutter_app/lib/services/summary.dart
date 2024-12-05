@@ -9,14 +9,12 @@ import 'package:sycx_flutter_app/utils/secure_storage.dart';
 import 'package:sycx_flutter_app/models/summary.dart';
 
 class SummaryService {
-  static final ApiClient apiClient = ApiClient(
-    httpClient: http.Client(),
-    baseUrl: Constants.baseUrl
-  );
+  static final ApiClient apiClient =
+      ApiClient(httpClient: http.Client(), baseUrl: Constants.baseUrl);
   static final Database database = Database();
 
   /// Handles document summarization with support for large file uploads
-  /// Supports file sizes up to 1.1GB 
+  /// Supports file sizes up to 1.1GB
   static Future<List<Summary>> summarizeDocuments({
     required List<File> files,
     required double summaryDepth,
@@ -26,9 +24,7 @@ class SummaryService {
     try {
       // Prepare multipart request with file upload
       final request = http.MultipartRequest(
-          'POST',
-          Uri.parse('${Constants.baseUrl}/summarize')
-      );
+          'POST', Uri.parse('${Constants.baseUrl}/summarize'));
 
       // Add fields to the request
       request.fields.addAll({
@@ -47,56 +43,51 @@ class SummaryService {
         originalDocuments.add(OriginalDocument(
             title: path.basename(file.path),
             content: fileContent,
-            type: path.extension(file.path).replaceFirst('.', '')
-        ));
+            type: path.extension(file.path).replaceFirst('.', '')));
 
         // Add file to the multipart request
-        request.files.add(
-            await http.MultipartFile.fromPath(
-                path.basename(file.path),
-                file.path
-            )
-        );
+        request.files.add(await http.MultipartFile.fromPath(
+            path.basename(file.path), file.path));
       }
 
       // Send the request using a stream
       final streamedResponse = await request.send();
 
-      // Handle response
+// Handle response
       if (streamedResponse.statusCode == 200) {
-        // Read response body
+// Read response body
         final responseBody = await streamedResponse.stream.bytesToString();
         final Map<String, dynamic> responseJson = json.decode(responseBody);
 
-        // Check for successful status
+// Check for successful status
         if (responseJson['status'] != 'success') {
           throw Exception('Summarization failed: ${responseJson['message']}');
         }
 
-        // Create summaries list to store
+// Create summaries list to store
         List<Summary> summaries = [];
 
-        // Process each summary in the response
+// Process each summary in the response
         for (var summaryData in responseJson['summaries']) {
-          // Create summary object
+// Create summary object
           final summary = Summary(
             id: DateTime.now().millisecondsSinceEpoch.toString(),
             userId: userId,
             originalDocuments: originalDocuments,
-            // Store the entire summary response as a JSON string
-            summaryContent: json.encode(summaryData),
+// Store the summary content as-is, without encoding/decoding
+            summaryContent: summaryData['content'],
             createdAt: DateTime.now(),
             updatedAt: DateTime.now(),
           );
 
-          // Save summary to database
+// Save summary to database
           await database.createSummary(summary);
           summaries.add(summary);
         }
 
         return summaries;
       } else {
-        // Handle error response
+// Handle error response
         final errorBody = await streamedResponse.stream.bytesToString();
         throw Exception('Failed to summarize documents: $errorBody');
       }

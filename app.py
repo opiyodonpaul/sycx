@@ -5,14 +5,12 @@ import logging
 import traceback
 import time
 import gc
+import json
 from flask import Flask, request, jsonify
-from werkzeug.utils import secure_filename
 from dotenv import load_dotenv
 from concurrent.futures import ThreadPoolExecutor
-import mimetypes
 
 def create_app():
-    # Existing logging and configuration setup remains the same
     app = Flask(__name__)
     
     # Enhanced configuration for large file uploads
@@ -195,7 +193,7 @@ def create_app():
                 }), 400
 
             # Import summarization modules
-            from summarie import generate_summary, enrich_summary_with_visuals
+            from summarie import generate_summary
 
             # Generate summaries
             summaries = generate_summary(
@@ -205,17 +203,11 @@ def create_app():
                 language=language
             )
 
-            # Enrich summaries with visuals
-            enriched_summaries = [
-                enrich_summary_with_visuals(summary) 
-                for summary in summaries
-            ]
-
             execution_time = time.time() - start_time
             
             return jsonify({
                 'status': 'success',
-                'summaries': enriched_summaries,
+                'summaries': summaries,
                 'execution_time': execution_time
             })
 
@@ -229,7 +221,6 @@ def create_app():
         finally:
             gc.collect()
     
-    # Feedback and Health Check routes remain the same as in the original implementation
     @app.route('/feedback', methods=['POST'])
     def feedback():
         try:

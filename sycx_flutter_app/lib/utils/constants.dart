@@ -5,7 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 class Constants {
   static const String baseUrl = 'http://10.0.2.2:5000';
   // static const String baseUrl = 'https://sycx.onrender.com';
-  static const String accessKey = 'es3EmOY-JpODxTpk51-VgMkrGeZwGZKE8xKDqW_Bdkk';
+  static const String accessKey = 'RYEZq3UPB3D8wEQWsrg-gPc9Y-ap1JkToBaFg-omlLE';
 }
 
 // Create an instance for easier access

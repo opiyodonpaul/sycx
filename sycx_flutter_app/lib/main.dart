@@ -2,6 +2,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:sycx_flutter_app/dummy_data.dart';
 import 'package:sycx_flutter_app/firebase_options.dart';
+import 'package:sycx_flutter_app/models/summary.dart';
 import 'package:sycx_flutter_app/screens/account_settings.dart';
 import 'package:sycx_flutter_app/screens/auth/forgot_password.dart';
 import 'package:sycx_flutter_app/screens/auth/login.dart';
@@ -67,13 +68,21 @@ class MyApp extends StatelessWidget {
         '/forgot_password': (context) => const ForgotPassword(),
         '/home': (context) => const Home(),
         '/search': (context) => const SearchResults(searchQuery: ''),
-        '/summary_details': (context) => const SummaryDetails(
-              summary: {},
-              imageUrl: '',
-            ),
-        '/view_summary': (context) => const ViewSummary(
-              summary: {},
-            ),
+        '/summary_details': (context) {
+          final args = ModalRoute.of(context)!.settings.arguments
+              as Map<String, dynamic>;
+          return SummaryDetails(
+            summary: args['summary'],
+            imageUrl: args['imageUrl'] ?? '',
+          );
+        },
+        '/view_summary': (context) {
+          final args = ModalRoute.of(context)!.settings.arguments
+              as Map<String, dynamic>;
+          return ViewSummary(
+            summary: Summary.fromJson(args['summary']),
+          );
+        },
         '/upload': (context) => const Upload(),
         '/summaries': (context) => const Summaries(),
         '/profile': (context) => const Profile(),

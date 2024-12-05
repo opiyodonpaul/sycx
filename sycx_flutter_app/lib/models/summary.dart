@@ -26,21 +26,9 @@ class Summary {
         : 'Untitled';
   }
 
-  // Method to parse the summary content
-  Map<String, dynamic> parseSummaryContent() {
-    try {
-      return json.decode(summaryContent);
-    } catch (e) {
-      print('Error parsing summary content: $e');
-      return {};
-    }
-  }
-
-  // Method to get summary text (assuming a specific structure in the summary)
-  String getSummaryText() {
-    final parsedContent = parseSummaryContent();
-    // Adjust this based on the actual structure of your summary JSON
-    return parsedContent['summary'] ?? parsedContent['text'] ?? 'No summary available';
+  Future<String> getFormattedSummaryText() async {
+    // Simply return the summaryContent as it is now unencoded
+    return summaryContent;
   }
 
   factory Summary.fromFirestore(DocumentSnapshot doc) {
@@ -135,7 +123,6 @@ class Summary {
     );
   }
 
-  // Method to decode base64 content of original documents
   List<int> decodeDocumentContent(OriginalDocument doc) {
     try {
       return base64Decode(doc.content);
