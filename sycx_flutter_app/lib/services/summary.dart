@@ -18,7 +18,6 @@ class SummaryService {
   static Future<List<Summary>> summarizeDocuments({
     required List<File> files,
     required double summaryDepth,
-    required String language,
     required String userId,
   }) async {
     try {
@@ -29,7 +28,6 @@ class SummaryService {
       // Add fields to the request
       request.fields.addAll({
         'summary_depth': summaryDepth.toString(),
-        'language': language,
         'user_id': userId,
       });
 

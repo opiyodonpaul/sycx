@@ -5,8 +5,11 @@ import logging
 from logging.handlers import RotatingFileHandler
 from typing import Optional, List, Dict, Union
 import os
+import base64
+import io
 from dotenv import load_dotenv
 import time
+import traceback
 import re
 import psutil
 import gc
@@ -129,6 +132,50 @@ class SummarizationModel:
                 logging.error(f"Error creating pipeline: {str(e)}")
                 raise RuntimeError(f"Failed to create summarization pipeline: {str(e)}")
 
+            # Depth-based summary configuration with refined parameters
+            self.depth_configs = {
+                0.0: {  # Minimal
+                    'max_length_ratio': 0.05,
+                    'min_length_ratio': 0.02,
+                    'num_beams': 2,
+                    'length_penalty': 0.6,
+                    'description': 'Bare essentials (5-10% retained)',
+                    'detail_retained': '5-10%'
+                },
+                1.0: {  # Short
+                    'max_length_ratio': 0.15,
+                    'min_length_ratio': 0.05,
+                    'num_beams': 3,
+                    'length_penalty': 0.8,
+                    'description': 'Key points (10-20% retained)',
+                    'detail_retained': '10-20%'
+                },
+                2.0: {  # Medium
+                    'max_length_ratio': 0.3,
+                    'min_length_ratio': 0.1,
+                    'num_beams': 4,
+                    'length_penalty': 1.0,
+                    'description': 'Comprehensive overview (20-30% retained)',
+                    'detail_retained': '20-30%'
+                },
+                3.0: {  # Standard
+                    'max_length_ratio': 0.4,
+                    'min_length_ratio': 0.2,
+                    'num_beams': 5,
+                    'length_penalty': 1.1,
+                    'description': 'Detailed summary (30-40% retained)',
+                    'detail_retained': '30-40%'
+                },
+                4.0: {  # Comprehensive
+                    'max_length_ratio': 0.6,
+                    'min_length_ratio': 0.3,
+                    'num_beams': 6,
+                    'length_penalty': 1.2,
+                    'description': 'Full detailed summary (40-60% retained)',
+                    'detail_retained': '40-60%'
+                }
+            }
+            
             self.max_chunk_size = 1024
             self.min_chunk_size = 10
             self.batch_size = 4 if torch.cuda.is_available() else 1
@@ -186,117 +233,94 @@ class SummarizationModel:
         """Dynamically optimize summary length parameters based on input characteristics."""
         try:
             input_length = len(text.split())
-            max_length = int(input_length * min(summary_depth, self.max_length_ratio))
-            min_length = int(input_length * max(summary_depth * 0.3, self.min_length_ratio))
+            max_length_ratio = min(summary_depth, self.max_length_ratio)
+            min_length_ratio = max(summary_depth * 0.3, self.min_length_ratio)
+
+            max_length = int(input_length * max_length_ratio)
+            min_length = int(input_length * min_length_ratio)
+
             max_length = min(max(max_length, 20), 1024)
-            min_length = min(max(min_length, 5), max_length - 5)
+            min_length = min(max(min_length, 10), max_length - 10)
+
             return max_length, min_length
         except Exception as e:
             logging.error(f"Error in optimize_length_params: {str(e)}")
             return 100, 30  # Default fallback values
 
-    def generate_summary(self, text: str, summary_depth: float = 0.3, timeout: int = 30) -> Optional[str]:
-        """Generate a summary with robust error handling."""
+    def generate_summary(self, text: str, summary_depth: float = 1.0) -> Optional[str]:
+        """
+        Generate summary with depth-based configuration.
+        
+        Args:
+            text (str): Input text to summarize
+            summary_depth (float): Summary depth from 0.0 to 3.0
+        
+        Returns:
+            Optional[str]: Generated summary or error message
+        """
         try:
-            # Validate input
-            if not text or not isinstance(text, str):
-                return "Invalid input text"
-            
-            # Preprocess text
+            # Validate and preprocess input
             cleaned_text = self.preprocess_text(text)
             if not cleaned_text:
-                return "Empty text after preprocessing"
-            
-            # Tokenize and truncate input
+                return "Invalid or empty input text"
+
+            # Find the closest depth configuration key
+            depth_key = min(self.depth_configs.keys(), key=lambda k: abs(k - summary_depth))
+            config = self.depth_configs[depth_key]
+
+            # Compute dynamic length parameters based on input text and depth configuration
+            max_length, min_length = self.optimize_length_params(cleaned_text, summary_depth)
+
             try:
-                input_tokens = self.tokenizer.encode(
-                    cleaned_text, 
-                    truncation=True, 
-                    max_length=1024, 
-                    return_tensors="pt"
-                )
-            except Exception as e:
-                logging.error(f"Tokenization error: {str(e)}")
-                return "Error in text preprocessing"
-            
-            # Compute summary length parameters
-            try:
-                max_length, min_length = self.optimize_length_params(cleaned_text, summary_depth)
-            except Exception as e:
-                logging.error(f"Length parameter error: {str(e)}")
-                max_length, min_length = 100, 30
-            
-            # Safe summarization with error handling
-            try:
-                # Move input to same device as model
-                input_tokens = input_tokens.to(self.device)
-                
-                # Generate summary with defensive programming
-                summary_ids = self.model.generate(
-                    input_tokens,
+                summary_result = self.summarizer(
+                    cleaned_text,
                     max_length=max_length,
                     min_length=min_length,
-                    num_beams=4,
-                    no_repeat_ngram_size=2,
-                    early_stopping=True
+                    num_beams=config['num_beams'],
+                    length_penalty=config['length_penalty']
                 )
-                
-                # Decode summary safely
-                summary = self.tokenizer.decode(
-                    summary_ids[0], 
-                    skip_special_tokens=True
-                ).strip()
-                
-                return summary if summary else "No summary generated"
-            
-            except Exception as e:
-                logging.error(f"Summarization generation error: {str(e)}")
-                return f"Summarization error: {str(e)}"
-        
+
+                if summary_result and isinstance(summary_result, list) and summary_result:
+                    summary_text = summary_result[0].get('summary_text', '')
+                    return summary_text if summary_text else "No summary generated"
+                else:
+                    return "No summary generated"
+            except IndexError:
+                logging.error("Index out of range in summary generation")
+                return "Error generating summary: Unexpected result structure"
+
         except Exception as e:
-            logging.error(f"Unexpected summary generation error: {str(e)}")
-            return "Unable to generate summary"
+            logging.error(f"Error in generate_summary: {str(e)}")
+            return f"Error generating summary: {str(e)}"
 
     def chunk_text(self, text: str) -> List[str]:
         """Improved text chunking with sentence boundary preservation."""
         try:
             if not text:
                 return []
-                
-            # Add error handling for sentence tokenization
-            try:
-                sentences = nltk.sent_tokenize(text)
-            except Exception as e:
-                logging.error(f"Error in sentence tokenization: {str(e)}")
-                # Fallback to simple splitting
-                sentences = [s.strip() + '.' for s in text.split('.') if s.strip()]
 
+            sentences = nltk.sent_tokenize(text)
             chunks, current_chunk, current_length = [], [], 0
-            
+
             for sentence in sentences:
-                try:
-                    sentence_length = len(self.tokenizer.encode(sentence))
-                except Exception as e:
-                    logging.error(f"Error encoding sentence: {str(e)}")
-                    sentence_length = len(sentence.split())  # Fallback to word count
-                    
+                sentence_length = len(self.tokenizer.encode(sentence))
                 if current_length + sentence_length > self.max_chunk_size:
                     if current_chunk:
                         chunks.append(' '.join(current_chunk))
                         current_chunk, current_length = [], 0
                 current_chunk.append(sentence)
                 current_length += sentence_length
-                
+
             if current_chunk:
                 chunks.append(' '.join(current_chunk))
-                
-            return chunks if chunks else [text]
-            
+
+            return chunks or [text]
+        
         except Exception as e:
             logging.error(f"Error in chunk_text: {str(e)}")
             return [text]
 
-    def summarize_long_document(self, text: str, summary_depth: float = 0.3, max_time: int = 300) -> str:
+    def summarize_long_document(self, text: str, summary_depth: float = 1.0, max_time: int = 900) -> str:
         """Handle long documents with improved chunking and multi-stage summarization."""
         try:
             start_time = time.time()
