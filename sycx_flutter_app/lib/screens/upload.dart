@@ -805,8 +805,8 @@ class UploadState extends State<Upload> with TickerProviderStateMixin {
                 physics: const NeverScrollableScrollPhysics(),
                 padding: EdgeInsets.zero,
                 children: [
-                  _buildInstructionStep('1', 'Upload files',
-                      'Tap "Upload" and select documents.'),
+                  _buildInstructionStep(
+                      '1', 'Upload file', 'Tap "Upload" and select document.'),
                   _buildInstructionStep(
                       '2', 'Preview', 'Tap file cards to view contents.'),
                   _buildInstructionStep(
@@ -816,11 +816,7 @@ class UploadState extends State<Upload> with TickerProviderStateMixin {
                   _buildInstructionStep(
                       '5', 'Set depth', 'Adjust slider for summary detail.'),
                   _buildInstructionStep(
-                      '6', 'Language', 'Choose output language from dropdown.'),
-                  _buildInstructionStep(
-                      '7', 'Merge', 'Choose to combine or separate summaries.'),
-                  _buildInstructionStep(
-                      '8', 'Generate', 'Tap "Summarize" to process files.'),
+                      '6', 'Generate', 'Tap "Summarize" to process files.'),
                 ],
               ),
             ],

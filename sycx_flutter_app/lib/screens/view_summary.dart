@@ -1,6 +1,8 @@
+
 import 'package:flutter/material.dart';
 import 'package:flutter_html/flutter_html.dart';
 import 'package:sycx_flutter_app/models/summary.dart';
+import 'package:sycx_flutter_app/services/summary_formatter.dart';
 import 'package:sycx_flutter_app/utils/constants.dart';
 import 'package:sycx_flutter_app/widgets/custom_app_bar_mini.dart';
 import 'package:sycx_flutter_app/widgets/custom_bottom_nav_bar.dart';
@@ -15,25 +17,24 @@ class ViewSummary extends StatefulWidget {
 }
 
 class ViewSummaryState extends State<ViewSummary> {
-  late String summaryText;
+  late String formattedSummaryContent;
 
   @override
   void initState() {
     super.initState();
-    _loadSummaryText();
+    _loadFormattedSummaryContent();
   }
 
-  Future<void> _loadSummaryText() async {
+  Future<void> _loadFormattedSummaryContent() async {
     try {
-      // Directly use summaryContent from the summary
-      final formattedSummaryText = await widget.summary.getFormattedSummaryText();
+      final formattedContent = await SummaryFormatter.formatSummary(widget.summary.summaryContent);
       setState(() {
-        summaryText = formattedSummaryText;
+        formattedSummaryContent = formattedContent;
       });
     } catch (e) {
-      print('Error loading summary text: $e');
+      print('Error loading formatted summary content: $e');
       setState(() {
-        summaryText = 'Error loading summary';
+        formattedSummaryContent = 'Error loading summary';
       });
     }
   }
@@ -56,15 +57,14 @@ class ViewSummaryState extends State<ViewSummary> {
                   widget.summary.title ?? 'Untitled Summary',
                   style: AppTextStyles.headingStyleNoShadow.copyWith(
                     color: AppColors.primaryTextColorDark,
+                    fontFamily: 'Architects Daughter',
+                    fontSize: 32,
                   ),
                 ),
                 const SizedBox(height: 16.0),
-                if (summaryText.isNotEmpty)
-                  Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 8.0),
-                    child: Html(
-                      data: summaryText,
-                    ),
+                if (formattedSummaryContent.isNotEmpty)
+                  Html(
+                    data: formattedSummaryContent,
                   )
                 else
                   const CircularProgressIndicator(),

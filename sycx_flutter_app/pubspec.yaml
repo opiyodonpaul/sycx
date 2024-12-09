@@ -73,8 +73,11 @@ dependencies:
   printing: ^5.13.4
   permission_handler: ^11.3.1
   uuid: ^4.5.1
-  mime: ^2.0.0
+  mime: ^1.0.2
   flutter_html: ^3.0.0-beta.2
+  firebase_storage: ^12.3.7
+  supabase_flutter: ^2.8.1
+  html: ^0.15.4
 
 flutter_launcher_icons:
   android: true

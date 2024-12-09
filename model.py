@@ -213,85 +213,92 @@ class SummarizationModel:
         return text
 
     def preprocess_text(self, text: str) -> str:
-        """Comprehensive text preprocessing pipeline."""
-        try:
-            if not text:
-                return ""
-            text = self.clean_text(text)
-            text = re.sub(r'\n+', '\n', text)
-            text = re.sub(r'([.!?])\n', r'\1 ', text)
-            text = re.sub(r'(\w)-\n(\w)', r'\1\2', text)
-            text = re.sub(r'(?<=[.!?])\s*(?=[A-Z])', ' ', text)
-            text = re.sub(r'Page \d+( of \d+)?', '', text)
-            text = re.sub(r'^\s*Table of Contents\s*$', '', text, flags=re.MULTILINE)
-            return text
-        except Exception as e:
-            logging.error(f"Error in preprocess_text: {str(e)}")
-            return text if isinstance(text, str) else ""
-
-    def optimize_length_params(self, text: str, summary_depth: float = 0.3) -> tuple[int, int]:
-        """Dynamically optimize summary length parameters based on input characteristics."""
-        try:
-            input_length = len(text.split())
-            max_length_ratio = min(summary_depth, self.max_length_ratio)
-            min_length_ratio = max(summary_depth * 0.3, self.min_length_ratio)
-
-            max_length = int(input_length * max_length_ratio)
-            min_length = int(input_length * min_length_ratio)
-
-            max_length = min(max(max_length, 20), 1024)
-            min_length = min(max(min_length, 10), max_length - 10)
-
-            return max_length, min_length
-        except Exception as e:
-            logging.error(f"Error in optimize_length_params: {str(e)}")
-            return 100, 30  # Default fallback values
-
-    def generate_summary(self, text: str, summary_depth: float = 1.0) -> Optional[str]:
         """
-        Generate summary with depth-based configuration.
+        Perform basic text preprocessing.
+        
+        Args:
+            text (str): Input text
+        
+        Returns:
+            str: Preprocessed text
+        """
+        if not text:
+            return ""
+        text = re.sub(r'\n+', ' ', text)
+        text = re.sub(r'[ ]+', ' ', text)
+        return text.strip()
+
+    def optimize_length_params(self, text: str, summary_depth: float = 1.0) -> tuple[int, int]:
+        """
+        Dynamically optimize summary length parameters based on input characteristics.
+        
+        Args:
+            text (str): Input text
+            summary_depth (float): Summary depth
+        
+        Returns:
+            tuple[int, int]: Maximum and minimum length for summarization
+        """
+        input_length = len(text.split())
+        max_length_ratio = min(summary_depth, 0.4)
+        min_length_ratio = min(max_length_ratio * 0.5, 0.1)  # Ensure min_length is less than max_length
+
+        max_length = max(int(input_length * max_length_ratio), 5)
+        min_length = max(int(input_length * min_length_ratio), 1)
+
+        # Ensure min_length is always less than max_length
+        min_length = min(min_length, max_length - 1)
+
+        return max_length, min_length
+
+    def generate_summary(self, text: str, summary_depth: float = 1.0) -> str:
+        """
+        Generate summary with improved handling of short inputs and length constraints.
         
         Args:
             text (str): Input text to summarize
-            summary_depth (float): Summary depth from 0.0 to 3.0
+            summary_depth (float): Summary depth from 0.0 to 4.0
         
         Returns:
-            Optional[str]: Generated summary or error message
+            str: Generated summary or original text if summarization is not possible
         """
         try:
-            # Validate and preprocess input
+            # Clean and preprocess the input text
             cleaned_text = self.preprocess_text(text)
-            if not cleaned_text:
-                return "Invalid or empty input text"
 
-            # Find the closest depth configuration key
-            depth_key = min(self.depth_configs.keys(), key=lambda k: abs(k - summary_depth))
-            config = self.depth_configs[depth_key]
+            # Handle very short inputs
+            if len(cleaned_text.split()) <= 10:
+                return cleaned_text
 
-            # Compute dynamic length parameters based on input text and depth configuration
+            # Compute dynamic length parameters based on input text
             max_length, min_length = self.optimize_length_params(cleaned_text, summary_depth)
 
+            # Additional safety check
+            if min_length >= max_length:
+                min_length = max(1, max_length // 2)
+
+            # Generate the summary
             try:
                 summary_result = self.summarizer(
                     cleaned_text,
                     max_length=max_length,
                     min_length=min_length,
-                    num_beams=config['num_beams'],
-                    length_penalty=config['length_penalty']
+                    num_beams=4,
+                    length_penalty=1.0
                 )
 
                 if summary_result and isinstance(summary_result, list) and summary_result:
                     summary_text = summary_result[0].get('summary_text', '')
-                    return summary_text if summary_text else "No summary generated"
+                    return summary_text if summary_text else cleaned_text
                 else:
-                    return "No summary generated"
-            except IndexError:
-                logging.error("Index out of range in summary generation")
-                return "Error generating summary: Unexpected result structure"
+                    return cleaned_text
+            except Exception as e:
+                logging.error(f"Summarization pipeline error: {str(e)}")
+                return cleaned_text
 
         except Exception as e:
             logging.error(f"Error in generate_summary: {str(e)}")
-            return f"Error generating summary: {str(e)}"
+            return cleaned_text
 
     def chunk_text(self, text: str) -> List[str]:
         """Improved text chunking with sentence boundary preservation."""

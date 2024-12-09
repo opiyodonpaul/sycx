@@ -3,9 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:animations/animations.dart';
 import 'package:intl/intl.dart';
 import 'package:sycx_flutter_app/models/summary.dart';
+import 'package:sycx_flutter_app/services/unsplash.dart';
 import 'package:sycx_flutter_app/utils/constants.dart';
 import 'package:sycx_flutter_app/screens/summary_details.dart';
-import 'package:sycx_flutter_app/services/unsplash.dart';
 
 class SummaryCard extends StatefulWidget {
   final Summary summary;
@@ -29,21 +29,25 @@ class _SummaryCardState extends State<SummaryCard> {
   @override
   void initState() {
     super.initState();
-    // Only fetch image for non-empty cards
-    if (!widget.isEmpty) {
-      _fetchImageUrl();
-    }
+    _fetchRandomImage();
   }
 
-  Future<void> _fetchImageUrl() async {
+  Future<void> _fetchRandomImage() async {
     final title = _getCardTitle();
-    // Attempt to fetch image URL
-    final fetchedImageUrl = await Unsplash.getRandomImageUrl(title);
-
-    // Update state only if mounted and image URL is found
-    if (mounted) {
+    final imageUrl = await Unsplash.getRandomImageUrl(title);
+    if (imageUrl != null) {
       setState(() {
-        _imageUrl = fetchedImageUrl;
+        _imageUrl = imageUrl;
+      });
+    } else {
+      // Fetch fallback image URL based on the file type of the first original document
+      final fallbackImageUrl = await Unsplash.getFallbackImageUrl(
+        widget.summary.originalDocuments.isNotEmpty
+            ? widget.summary.originalDocuments.first.type ?? ''
+            : '',
+      );
+      setState(() {
+        _imageUrl = fallbackImageUrl;
       });
     }
   }

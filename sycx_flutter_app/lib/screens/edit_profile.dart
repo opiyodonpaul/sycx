@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:sycx_flutter_app/models/user.dart' as app_user;
 import 'package:sycx_flutter_app/utils/constants.dart';
 import 'package:sycx_flutter_app/widgets/custom_app_bar_mini.dart';
 import 'package:sycx_flutter_app/widgets/custom_bottom_nav_bar.dart';
@@ -6,6 +7,7 @@ import 'package:sycx_flutter_app/widgets/custom_textfield.dart';
 import 'package:sycx_flutter_app/widgets/animated_button.dart';
 import 'package:sycx_flutter_app/utils/pick_image.dart';
 import 'package:sycx_flutter_app/utils/convert_to_base64.dart';
+import 'package:sycx_flutter_app/services/database.dart';
 import 'dart:io';
 import 'dart:async';
 import 'package:flutter/foundation.dart';
@@ -13,9 +15,9 @@ import 'package:fluttertoast/fluttertoast.dart';
 import 'package:sycx_flutter_app/widgets/loading.dart';
 
 class EditProfile extends StatefulWidget {
-  final Map<String, dynamic> userData;
+  final app_user.User? userData;
 
-  const EditProfile({super.key, required this.userData});
+  const EditProfile({super.key, this.userData});
 
   @override
   EditProfileState createState() => EditProfileState();
@@ -24,25 +26,31 @@ class EditProfile extends StatefulWidget {
 class EditProfileState extends State<EditProfile> {
   late TextEditingController _nameController;
   late TextEditingController _emailController;
+  late TextEditingController _usernameController;
   File? _selectedImage;
   final FocusNode _nameFocus = FocusNode();
   final FocusNode _emailFocus = FocusNode();
+  final FocusNode _usernameFocus = FocusNode();
   bool _isLoading = false;
   Timer? _debounceTimer;
+  final Database _database = Database();
 
   @override
   void initState() {
     super.initState();
-    _nameController = TextEditingController(text: widget.userData['name']);
-    _emailController = TextEditingController(text: widget.userData['email']);
+    _nameController = TextEditingController(text: widget.userData?.name);
+    _emailController = TextEditingController(text: widget.userData?.email);
+    _usernameController = TextEditingController(text: widget.userData?.userName);
   }
 
   @override
   void dispose() {
     _nameController.dispose();
     _emailController.dispose();
+    _usernameController.dispose();
     _nameFocus.dispose();
     _emailFocus.dispose();
+    _usernameFocus.dispose();
     _debounceTimer?.cancel();
     super.dispose();
   }
@@ -76,18 +84,22 @@ class EditProfileState extends State<EditProfile> {
               await compute(convertFileToBase64Compute, _selectedImage!);
         }
 
-        final updatedUserData = {
-          ...widget.userData,
-          'name': _nameController.text,
-          'email': _emailController.text,
-          if (base64Image != null) 'avatar': base64Image,
-        };
+        // Create an updated user object
+        final updatedUser = app_user.User(
+          id: widget.userData!.id,
+          fullName: _nameController.text,
+          userName: _usernameController.text,
+          email: _emailController.text,
+          userProfile: base64Image ?? widget.userData?.profileImage ?? '',
+          createdAt: widget.userData!.createdAt,
+          updatedAt: DateTime.now(), // Update the updated at timestamp
+        );
 
-        // Simulate a network delay (remove in production)
-        await Future.delayed(const Duration(seconds: 2));
+        // Update user in Firestore
+        await _database.updateUser(updatedUser);
 
         setState(() => _isLoading = false);
-        Navigator.pop(context, updatedUserData);
+        Navigator.pop(context, updatedUser);
       } catch (e) {
         setState(() => _isLoading = false);
         print('Error updating profile: $e');
@@ -133,11 +145,24 @@ class EditProfileState extends State<EditProfile> {
                       CustomTextField(
                         controller: _nameController,
                         focusNode: _nameFocus,
-                        hintText: 'Name',
+                        hintText: 'Full Name',
                         onChanged: (value) {},
                         validator: (value) =>
                             value!.isEmpty ? 'Name cannot be empty' : null,
                         prefixIcon: Icons.person,
+                        onFieldSubmitted: (_) {
+                          FocusScope.of(context).requestFocus(_usernameFocus);
+                        },
+                      ),
+                      const SizedBox(height: 16),
+                      CustomTextField(
+                        controller: _usernameController,
+                        focusNode: _usernameFocus,
+                        hintText: 'Username',
+                        onChanged: (value) {},
+                        validator: (value) =>
+                            value!.isEmpty ? 'Username cannot be empty' : null,
+                        prefixIcon: Icons.alternate_email,
                         onFieldSubmitted: (_) {
                           FocusScope.of(context).requestFocus(_emailFocus);
                         },
@@ -187,7 +212,7 @@ class EditProfileState extends State<EditProfile> {
             radius: 90,
             backgroundImage: _selectedImage != null
                 ? FileImage(_selectedImage!) as ImageProvider
-                : NetworkImage(widget.userData['avatar']),
+                : NetworkImage(widget.userData?.profileImage ?? ''),
           ),
         ),
       ),

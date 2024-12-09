@@ -1,5 +1,7 @@
+import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
 import 'package:flutter/material.dart';
-import 'package:sycx_flutter_app/dummy_data.dart';
+import 'package:sycx_flutter_app/models/user.dart' as app_user;
+import 'package:sycx_flutter_app/services/database.dart';
 import 'package:sycx_flutter_app/utils/constants.dart';
 import 'package:sycx_flutter_app/widgets/custom_app_bar_mini.dart';
 import 'package:sycx_flutter_app/widgets/custom_bottom_nav_bar.dart';
@@ -19,7 +21,8 @@ class Profile extends StatefulWidget {
 class ProfileState extends State<Profile> with SingleTickerProviderStateMixin {
   bool _loading = false;
   late AnimationController _animationController;
-  Map<String, dynamic> userData = DummyData.user;
+  app_user.User? userData;
+  final Database _database = Database();
 
   @override
   void initState() {
@@ -32,14 +35,30 @@ class ProfileState extends State<Profile> with SingleTickerProviderStateMixin {
   }
 
   Future<void> _loadData() async {
-    setState(() {
-      _loading = true;
-    });
-    await Future.delayed(const Duration(seconds: 2));
-    setState(() {
-      _loading = false;
-    });
-    _animationController.forward();
+    try {
+      final firebaseUser = firebase_auth.FirebaseAuth.instance.currentUser;
+      if (firebaseUser != null) {
+        // Fetch user data using the database service
+        final user = await _database.getUser(firebaseUser.uid);
+
+        setState(() {
+          userData = user;
+          _loading = false;
+        });
+
+        _animationController.forward();
+      } else {
+        // Handle case where no user is logged in
+        setState(() {
+          _loading = false;
+        });
+      }
+    } catch (e) {
+      print('Error loading user data: $e');
+      setState(() {
+        _loading = false;
+      });
+    }
   }
 
   @override
@@ -53,18 +72,39 @@ class ProfileState extends State<Profile> with SingleTickerProviderStateMixin {
     return _loading
         ? const Loading()
         : Scaffold(
-            appBar: const CustomAppBarMini(title: 'Profile'),
-            body: RefreshIndicator(
-              onRefresh: _handleRefresh,
-              child: SingleChildScrollView(
-                physics: const AlwaysScrollableScrollPhysics(),
-                child: _buildBody(),
+      appBar: const CustomAppBarMini(title: 'Profile'),
+      body: RefreshIndicator(
+        onRefresh: _handleRefresh,
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          child: userData != null ? _buildBody() : _buildNoUserContent(),
+        ),
+      ),
+      bottomNavigationBar: const CustomBottomNavBar(
+        currentRoute: '/profile',
+      ),
+    );
+  }
+
+  Widget _buildNoUserContent() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.person_off, size: 100, color: Colors.grey),
+            const SizedBox(height: 16),
+            Text(
+              'No user data available',
+              style: AppTextStyles.titleStyle.copyWith(
+                color: AppColors.primaryTextColorDark,
               ),
             ),
-            bottomNavigationBar: const CustomBottomNavBar(
-              currentRoute: '/profile',
-            ),
-          );
+          ],
+        ),
+      ),
+    );
   }
 
   Widget _buildBody() {
@@ -94,6 +134,8 @@ class ProfileState extends State<Profile> with SingleTickerProviderStateMixin {
   }
 
   Widget _buildProfileHeader() {
+    if (userData == null) return Container();
+
     return Card(
       elevation: 0,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -113,13 +155,13 @@ class ProfileState extends State<Profile> with SingleTickerProviderStateMixin {
                 padding: const EdgeInsets.all(4),
                 child: CircleAvatar(
                   radius: 50,
-                  backgroundImage: NetworkImage(userData['avatar']),
+                  backgroundImage: NetworkImage(userData!.profileImage ?? ''),
                 ),
               ),
             ),
             const SizedBox(height: 12),
             Text(
-              userData['name'],
+              userData!.name,
               style: AppTextStyles.titleStyle.copyWith(
                 color: AppColors.primaryTextColorDark,
                 fontWeight: FontWeight.bold,
@@ -127,7 +169,7 @@ class ProfileState extends State<Profile> with SingleTickerProviderStateMixin {
               ),
             ),
             Text(
-              '@${userData['name'].toLowerCase()}',
+              '@${userData!.userName}',
               style: AppTextStyles.bodyTextStyle.copyWith(
                 color: AppColors.secondaryTextColorDark,
                 fontSize: 14,
@@ -139,7 +181,8 @@ class ProfileState extends State<Profile> with SingleTickerProviderStateMixin {
                 final result = await Navigator.push(
                   context,
                   MaterialPageRoute(
-                      builder: (context) => EditProfile(userData: userData)),
+                    builder: (context) => EditProfile(userData: userData!),
+                  ),
                 );
                 if (result != null) {
                   setState(() {

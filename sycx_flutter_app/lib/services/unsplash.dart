@@ -19,8 +19,7 @@ class Unsplash {
 
       final response = await http.get(
         Uri.parse(
-            '$_baseUrl/photos/random?query=${Uri.encodeComponent(sanitizedQuery)}&orientation=landscape'
-        ),
+            '$_baseUrl/photos/random?query=${Uri.encodeComponent(sanitizedQuery)}&orientation=landscape'),
         headers: {'Authorization': 'Client-ID ${Constants.accessKey}'},
       );
 
@@ -32,5 +31,44 @@ class Unsplash {
       print('Error fetching Unsplash image: $e');
     }
     return null;
+  }
+
+  /// Retrieve a fallback image URL based on the file type
+  ///
+  /// @param fileType The file type of the original document
+  /// @return Nullable image URL string
+  static Future<String?> getFallbackImageUrl(String fileType) async {
+    try {
+      final fallbackQuery = _getFallbackQueryForFileType(fileType);
+      if (fallbackQuery != null) {
+        return await getRandomImageUrl(fallbackQuery);
+      }
+    } catch (e) {
+      print('Error fetching fallback Unsplash image: $e');
+    }
+    return null;
+  }
+
+  /// Determine the appropriate fallback search query based on the file type
+  ///
+  /// @param fileType The file type of the original document
+  /// @return Nullable fallback search query string
+  static String? _getFallbackQueryForFileType(String fileType) {
+    switch (fileType.toLowerCase()) {
+      case 'pdf':
+        return 'pdf document';
+      case 'doc':
+      case 'docx':
+        return 'document';
+      case 'jpg':
+      case 'jpeg':
+      case 'png':
+      case 'gif':
+        return 'image';
+      case 'txt':
+        return 'text file';
+      default:
+        return null;
+    }
   }
 }
