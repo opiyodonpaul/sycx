@@ -65,14 +65,10 @@ def generate_summary(model, documents, summary_depth: float = 0.3, language: str
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
             future_summaries = {}
             for i, doc in enumerate(documents):
-                # Ensure content is not None and has sufficient length
+                # Remove minimum content length check
                 content = doc.get('content', '').strip()
                 
-                # Skip empty or very short documents
-                if not content or len(content.split()) < 5:
-                    logging.warning(f"Skipping document {i+1}: Insufficient content")
-                    continue
-
+                # Proceed with summarization even for very short content
                 future = executor.submit(
                     _safe_generate_summary, 
                     model, 
@@ -91,11 +87,11 @@ def generate_summary(model, documents, summary_depth: float = 0.3, language: str
                     doc_summary = future.result()
                     metadata = future_summaries[future]
                     
-                    if doc_summary:
-                        summary.append({
-                            'title': metadata['title'],
-                            'content': doc_summary
-                        })
+                    # Always add summary, even if it's just the original content
+                    summary.append({
+                        'title': metadata['title'],
+                        'content': doc_summary
+                    })
                 except Exception as e:
                     logging.error(f"Error processing document: {str(e)}")
 
@@ -109,7 +105,7 @@ def generate_summary(model, documents, summary_depth: float = 0.3, language: str
 
 def _safe_generate_summary(model, content, summary_depth, doc_name):
     """
-    Safely generate summary with fallback mechanisms.
+    Safely generate summary with enhanced fallback mechanisms.
     
     Args:
         model: Summarization model
@@ -118,22 +114,27 @@ def _safe_generate_summary(model, content, summary_depth, doc_name):
         doc_name (str): Name of the document for logging
     
     Returns:
-        str: Generated summary or original content if summarization fails
+        str: Generated summary or original content if summarization is impossible
     """
     try:
         # Limit content length to prevent excessive processing
         max_content_length = 100000
         truncated_content = content[:max_content_length]
         
+        # If content is very short, use entire content
+        if len(truncated_content.strip()) < 10:
+            logging.info(f"Very short content for {doc_name}. Using entire content.")
+            return truncated_content
+        
         # Attempt summarization with fallback
         summary = model.generate_summary(truncated_content, summary_depth)
         
-        # Validate summary
-        if not summary or len(summary.strip()) < 10:
-            logging.warning(f"Generated summary too short for {doc_name}. Using original content.")
+        # If no summary generated, use original content
+        if not summary or len(summary.strip()) == 0:
+            logging.warning(f"No summary generated for {doc_name}. Using original content.")
             return truncated_content
         
         return summary
     except Exception as e:
         logging.error(f"Summary generation error for {doc_name}: {str(e)}")
-        return content  # Return original content if summarization fails
+        return content  # Guaranteed fallback to original content

@@ -241,19 +241,16 @@ class SummarizationModel:
         """
         input_length = len(text.split())
         max_length_ratio = min(summary_depth, 0.4)
-        min_length_ratio = min(max_length_ratio * 0.5, 0.1)  # Ensure min_length is less than max_length
+        min_length_ratio = max(summary_depth * 0.3, 0.1)
 
         max_length = max(int(input_length * max_length_ratio), 5)
         min_length = max(int(input_length * min_length_ratio), 1)
-
-        # Ensure min_length is always less than max_length
-        min_length = min(min_length, max_length - 1)
 
         return max_length, min_length
 
     def generate_summary(self, text: str, summary_depth: float = 1.0) -> str:
         """
-        Generate summary with improved handling of short inputs and length constraints.
+        Generate summary with improved handling of short inputs.
         
         Args:
             text (str): Input text to summarize
@@ -266,36 +263,23 @@ class SummarizationModel:
             # Clean and preprocess the input text
             cleaned_text = self.preprocess_text(text)
 
-            # Handle very short inputs
-            if len(cleaned_text.split()) <= 10:
-                return cleaned_text
-
             # Compute dynamic length parameters based on input text
             max_length, min_length = self.optimize_length_params(cleaned_text, summary_depth)
 
-            # Additional safety check
-            if min_length >= max_length:
-                min_length = max(1, max_length // 2)
-
             # Generate the summary
-            try:
-                summary_result = self.summarizer(
-                    cleaned_text,
-                    max_length=max_length,
-                    min_length=min_length,
-                    num_beams=4,
-                    length_penalty=1.0
-                )
+            summary_result = self.summarizer(
+                cleaned_text,
+                max_length=max_length,
+                min_length=min_length,
+                num_beams=4,
+                length_penalty=1.0
+            )
 
-                if summary_result and isinstance(summary_result, list) and summary_result:
-                    summary_text = summary_result[0].get('summary_text', '')
-                    return summary_text if summary_text else cleaned_text
-                else:
-                    return cleaned_text
-            except Exception as e:
-                logging.error(f"Summarization pipeline error: {str(e)}")
+            if summary_result and isinstance(summary_result, list) and summary_result:
+                summary_text = summary_result[0].get('summary_text', '')
+                return summary_text if summary_text else cleaned_text
+            else:
                 return cleaned_text
-
         except Exception as e:
             logging.error(f"Error in generate_summary: {str(e)}")
             return cleaned_text
