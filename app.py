@@ -277,10 +277,13 @@ if __name__ == '__main__':
     # Load environment variables
     load_dotenv()
     
-    # Run the application
+    # Dynamically get PORT from environment, with fallback to 8000
+    port = int(os.environ.get('PORT', os.environ.get('APP_PORT', 8000)))
+    
+    # Modify gunicorn command in your deployment configuration to use this port dynamically
     app.run(
         debug=False,
         host='0.0.0.0',
-        port=int(os.environ.get('PORT', 8000)),
+        port=port,
         threaded=True
     )
