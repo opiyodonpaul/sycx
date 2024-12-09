@@ -1,6 +1,5 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
-import 'package:sycx_flutter_app/dummy_data.dart';
 import 'package:sycx_flutter_app/firebase_options.dart';
 import 'package:sycx_flutter_app/models/summary.dart';
 import 'package:sycx_flutter_app/screens/account_settings.dart';
@@ -86,7 +85,7 @@ class MyApp extends StatelessWidget {
         '/upload': (context) => const Upload(),
         '/summaries': (context) => const Summaries(),
         '/profile': (context) => const Profile(),
-        '/edit_profile': (context) => EditProfile(userData: DummyData.user),
+        '/edit_profile': (context) => const EditProfile(userData: null,),
         '/account_settings': (context) => const AccountSettings(),
         '/data_access': (context) => const DataAccess(),
         '/your_data': (context) => const YourData(),

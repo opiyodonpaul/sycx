@@ -77,6 +77,7 @@ dependencies:
   flutter_html: ^3.0.0-beta.2
   firebase_storage: ^12.3.7
   supabase_flutter: ^2.8.1
+  html: ^0.15.4
 
 flutter_launcher_icons:
   android: true

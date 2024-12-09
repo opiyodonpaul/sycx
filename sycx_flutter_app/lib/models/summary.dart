@@ -10,6 +10,7 @@ class Summary {
   final DateTime updatedAt;
   bool isPinned;
   String? title;
+  String? imageUrl;
 
   Summary({
     this.id = '',
@@ -88,6 +89,7 @@ class Summary {
       'updatedAt': Timestamp.fromDate(updatedAt),
       'isPinned': isPinned,
       'title': title,
+      'imageUrl': imageUrl,
     };
   }
 
@@ -100,6 +102,7 @@ class Summary {
       'updatedAt': updatedAt,
       'isPinned': isPinned,
       'summaryContent': summaryContent,
+      'imageUrl': imageUrl,
     };
   }
 
@@ -111,6 +114,7 @@ class Summary {
     DateTime? createdAt,
     DateTime? updatedAt,
     bool? isPinned,
+    String? imageUrl,
   }) {
     return Summary(
       id: id ?? this.id,
@@ -120,7 +124,7 @@ class Summary {
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       isPinned: isPinned ?? this.isPinned,
-    );
+    )..imageUrl = imageUrl ?? this.imageUrl;
   }
 
   List<int> decodeDocumentContent(OriginalDocument doc) {
