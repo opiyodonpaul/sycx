@@ -139,7 +139,6 @@ def create_app():
         try:
             # Extract parameters from form data or JSON
             summary_depth = float(request.form.get('summary_depth', 0.3))
-            language = request.form.get('language', 'english')
             user_id = request.form.get('user_id', 'default_user')
 
             # Determine input method (multipart form or base64 JSON)
@@ -199,8 +198,7 @@ def create_app():
             summaries = generate_summary(
                 model=summarization_model,
                 documents=processed_documents,
-                summary_depth=summary_depth,
-                language=language
+                summary_depth=summary_depth
             )
 
             execution_time = time.time() - start_time

@@ -70,7 +70,7 @@ class MyApp extends StatelessWidget {
         '/search': (context) => const SearchResults(searchQuery: ''),
         '/summary_details': (context) {
           final args = ModalRoute.of(context)!.settings.arguments
-              as Map<String, dynamic>;
+          as Map<String, dynamic>;
           return SummaryDetails(
             summary: args['summary'],
             imageUrl: args['imageUrl'] ?? '',
@@ -78,7 +78,7 @@ class MyApp extends StatelessWidget {
         },
         '/view_summary': (context) {
           final args = ModalRoute.of(context)!.settings.arguments
-              as Map<String, dynamic>;
+          as Map<String, dynamic>;
           return ViewSummary(
             summary: Summary.fromJson(args['summary']),
           );

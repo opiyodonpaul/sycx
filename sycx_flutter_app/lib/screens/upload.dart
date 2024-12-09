@@ -1,11 +1,12 @@
 import 'dart:async';
-import 'dart:convert';
 import 'dart:io';
 import 'dart:ui';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter_svg/svg.dart';
 import 'package:fluttertoast/fluttertoast.dart';
+import 'package:sycx_flutter_app/services/database.dart';
 import 'package:sycx_flutter_app/services/summary.dart';
 import 'package:sycx_flutter_app/utils/constants.dart';
 import 'package:sycx_flutter_app/widgets/animated_button.dart';
@@ -15,7 +16,6 @@ import 'package:sycx_flutter_app/widgets/loading.dart';
 import 'package:sycx_flutter_app/widgets/padded_round_slider_value_indicator_shape.dart';
 import 'package:dotted_border/dotted_border.dart';
 import 'package:syncfusion_flutter_pdfviewer/pdfviewer.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:sycx_flutter_app/models/user.dart' as app_user;
 
 class Upload extends StatefulWidget {
@@ -26,23 +26,13 @@ class Upload extends StatefulWidget {
 }
 
 class UploadState extends State<Upload> with TickerProviderStateMixin {
-  String? currentUserId;
   List<PlatformFile> uploadedFiles = [];
-  double summaryDepth = 0;
+  double summaryDepth = 1.0;
   bool isLoading = false;
   late AnimationController _animationController;
   late AnimationController _loadingAnimationController;
   late AnimationController _deleteAnimationController;
   late AnimationController _previewAnimationController;
-  String _selectedLanguage = 'English';
-  final List<String> _languages = [
-    'English',
-    'Swahili',
-    'Spanish',
-    'French',
-    'German',
-    'Chinese',
-  ];
   PlatformFile? _previewFile;
   dynamic _filePreviewContent;
   PdfViewerController? _pdfViewerController;
@@ -54,6 +44,41 @@ class UploadState extends State<Upload> with TickerProviderStateMixin {
 
   // User data
   app_user.User? _currentUser;
+  final Database _database = Database();
+
+  String _getSummaryDepthLabel() {
+    switch (summaryDepth.round()) {
+      case 0:
+        return 'Minimal';
+      case 1:
+        return 'Short';
+      case 2:
+        return 'Medium';
+      case 3:
+        return 'Standard';
+      case 4:
+        return 'Comprehensive';
+      default:
+        return 'Default';
+    }
+  }
+
+  String _getDetailRetained() {
+    switch (summaryDepth.round()) {
+      case 0:
+        return '5-10%';
+      case 1:
+        return '10-20%';
+      case 2:
+        return '20-30%';
+      case 3:
+        return '30-40%';
+      case 4:
+        return '40-60%';
+      default:
+        return '15-25%';
+    }
+  }
 
   @override
   void initState() {
@@ -76,8 +101,7 @@ class UploadState extends State<Upload> with TickerProviderStateMixin {
     );
     _animationController.forward();
     _pdfViewerController = PdfViewerController();
-    // Get the current user's ID
-    currentUserId = FirebaseAuth.instance.currentUser?.uid;
+    _loadUserData();
     CustomBottomNavBar.updateLastMainRoute('/upload');
   }
 
@@ -136,12 +160,18 @@ class UploadState extends State<Upload> with TickerProviderStateMixin {
     });
   }
 
-  Future<String> encodeFileToBase64(PlatformFile file) async {
+  Future<void> _loadUserData() async {
     try {
-      final bytes = await File(file.path!).readAsBytes();
-      return base64Encode(bytes);
+      // Get the current user
+      final firebaseUser = FirebaseAuth.instance.currentUser;
+      if (firebaseUser != null) {
+        final user = await _database.getUser(firebaseUser.uid);
+        setState(() {
+          _currentUser = user;
+        });
+      }
     } catch (e) {
-      throw Exception('Error encoding file: $e');
+      print('Error loading user data: $e');
     }
   }
 
@@ -149,12 +179,6 @@ class UploadState extends State<Upload> with TickerProviderStateMixin {
     // Validate file upload
     if (uploadedFiles.isEmpty) {
       Fluttertoast.showToast(msg: "Please upload at least one file");
-      return;
-    }
-
-    // Validate user authentication
-    if (currentUserId == null) {
-      Fluttertoast.showToast(msg: "User not authenticated");
       return;
     }
 
@@ -174,8 +198,7 @@ class UploadState extends State<Upload> with TickerProviderStateMixin {
       final summaries = await SummaryService.summarizeDocuments(
         files: fileInputs,
         summaryDepth: summaryDepth,
-        language: _selectedLanguage,
-        userId: currentUserId!,
+        userId: _currentUser!.id,
       );
 
       setState(() {
@@ -671,8 +694,6 @@ class UploadState extends State<Upload> with TickerProviderStateMixin {
                 const SizedBox(height: defaultMargin),
                 _buildSummarizationPreferences(),
                 const SizedBox(height: defaultMargin),
-                _buildLanguageSelector(),
-                const SizedBox(height: defaultMargin),
                 _buildSummarizeButton(),
               ],
             ),
@@ -1015,93 +1036,31 @@ class UploadState extends State<Upload> with TickerProviderStateMixin {
                 });
               },
               min: 0,
-              max: 3,
-              divisions: 3,
+              max: 4,
+              divisions: 4,
               label: _getSummaryDepthLabel(),
             ),
           ),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                'Selected: ${_getSummaryDepthLabel()}',
-                style: AppTextStyles.bodyTextStyle
-                    .copyWith(color: AppColors.primaryTextColorDark),
+              Expanded(
+                child: Text(
+                  'Selected: ${_getSummaryDepthLabel()}',
+                  style: AppTextStyles.bodyTextStyle
+                      .copyWith(color: AppColors.primaryTextColorDark),
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
-              Text(
-                'Detail retained: ${_getDetailRetained()}',
-                style: AppTextStyles.bodyTextStyle
-                    .copyWith(color: AppColors.primaryTextColorDark),
+              Expanded(
+                child: Text(
+                  'Detail retained: ${_getDetailRetained()}',
+                  style: AppTextStyles.bodyTextStyle
+                      .copyWith(color: AppColors.primaryTextColorDark),
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
             ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildLanguageSelector() {
-    return AnimatedBuilder(
-      animation: _animationController,
-      builder: (context, child) {
-        return Transform.translate(
-          offset: Tween<Offset>(
-            begin: const Offset(0, 50),
-            end: Offset.zero,
-          )
-              .animate(CurvedAnimation(
-                  parent: _animationController,
-                  curve: const Interval(0.9, 1.0, curve: Curves.easeOut)))
-              .value,
-          child: Opacity(
-            opacity: Tween<double>(begin: 0.0, end: 1.0)
-                .animate(CurvedAnimation(
-                    parent: _animationController,
-                    curve: const Interval(0.9, 1.0, curve: Curves.easeOut)))
-                .value,
-            child: child,
-          ),
-        );
-      },
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Summary Language',
-            style: AppTextStyles.titleStyle
-                .copyWith(color: AppColors.primaryTextColorDark),
-          ),
-          const SizedBox(height: 8),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            decoration: BoxDecoration(
-              color: AppColors.textFieldFillColor,
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: AppColors.textFieldBorderColor),
-            ),
-            child: DropdownButtonHideUnderline(
-              child: DropdownButton<String>(
-                value: _selectedLanguage,
-                icon: const Icon(Icons.arrow_drop_down,
-                    color: AppColors.primaryTextColor),
-                iconSize: 24,
-                elevation: 16,
-                style: AppTextStyles.bodyTextStyle,
-                dropdownColor: AppColors.textFieldFillColor,
-                isExpanded: true,
-                onChanged: (String? newValue) {
-                  setState(() {
-                    _selectedLanguage = newValue!;
-                  });
-                },
-                items: _languages.map<DropdownMenuItem<String>>((String value) {
-                  return DropdownMenuItem<String>(
-                    value: value,
-                    child: Text(value),
-                  );
-                }).toList(),
-              ),
-            ),
           ),
         ],
       ),
@@ -1138,36 +1097,6 @@ class UploadState extends State<Upload> with TickerProviderStateMixin {
         textColor: AppColors.primaryButtonTextColor,
       ),
     );
-  }
-
-  String _getSummaryDepthLabel() {
-    switch (summaryDepth.round()) {
-      case 0:
-        return 'Brief';
-      case 1:
-        return 'Moderate';
-      case 2:
-        return 'Detailed';
-      case 3:
-        return 'Comprehensive';
-      default:
-        return '';
-    }
-  }
-
-  String _getDetailRetained() {
-    switch (summaryDepth.round()) {
-      case 0:
-        return '25%';
-      case 1:
-        return '50%';
-      case 2:
-        return '75%';
-      case 3:
-        return '100%';
-      default:
-        return '';
-    }
   }
 
   IconData _getFileIcon(String? fileType) {
