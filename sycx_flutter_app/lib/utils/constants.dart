@@ -3,8 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 // Create a constants class to encapsulate constants
 class Constants {
-  static const String baseUrl = 'http://10.0.2.2:5000';
-  // static const String baseUrl = 'https://sycx.onrender.com';
+  static const String baseUrl = 'https://sycx-cm9b.onrender.com';
   static const String accessKey = 'RYEZq3UPB3D8wEQWsrg-gPc9Y-ap1JkToBaFg-omlLE';
 }
 
